@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="pres.peixinyi.sinan.model.sinan.mapper.SnTagMapper">
+  <resultMap id="BaseResultMap" type="pres.peixinyi.sinan.model.sinan.entity.SnTag">
+    <!--@mbg.generated-->
+    <!--@Table sn_tag-->
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="user_id" jdbcType="VARCHAR" property="userId" />
+    <result column="name" jdbcType="VARCHAR" property="name" />
+    <result column="pinyin" jdbcType="VARCHAR" property="pinyin" />
+    <result column="abbreviation" jdbcType="VARCHAR" property="abbreviation" />
+    <result column="color" jdbcType="VARCHAR" property="color" />
+    <result column="sort" jdbcType="INTEGER" property="sort" />
+    <result column="description" jdbcType="VARCHAR" property="description" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="deleted" jdbcType="INTEGER" property="deleted" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    <!--@mbg.generated-->
+    id, user_id, `name`, pinyin, abbreviation, color, sort, description, create_time, 
+    update_time, deleted
+  </sql>
+</mapper>

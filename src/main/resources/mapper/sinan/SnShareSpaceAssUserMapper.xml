@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="pres.peixinyi.sinan.model.sinan.mapper.SnShareSpaceAssUserMapper">
+  <resultMap id="BaseResultMap" type="pres.peixinyi.sinan.model.sinan.entity.SnShareSpaceAssUser">
+    <!--@mbg.generated-->
+    <!--@Table sn_share_space_ass_user-->
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="user_id" jdbcType="VARCHAR" property="userId" />
+    <result column="space_id" jdbcType="VARCHAR" property="spaceId" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="deleted" jdbcType="INTEGER" property="deleted" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    <!--@mbg.generated-->
+    id, user_id, space_id, create_time, update_time, deleted
+  </sql>
+</mapper>
