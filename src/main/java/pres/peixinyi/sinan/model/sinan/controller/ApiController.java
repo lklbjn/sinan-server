@@ -1,5 +1,6 @@
 package pres.peixinyi.sinan.model.sinan.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.util.StringUtils;
@@ -371,4 +372,78 @@ public class ApiController {
             return Result.fail("获取书签失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 增加书签使用次数
+     *
+     * @param id 书签ID
+     * @return 操作结果
+     */
+    @GetMapping("increment-usage")
+    public Result<String> incrementBookmarkUsage(
+            @RequestHeader("X-Access-Key") String accessKey,
+            @RequestParam("id") String id) {
+        String userId = authenticateUser(accessKey);
+        if (userId == null) {
+            return Result.fail("无效的访问密钥");
+        }
+        // 检查书签是否存在且属于当前用户
+        SnBookmark bookmark = bookmarkService.getBookmarkByUserAndId(id, userId);
+        if (bookmark == null) {
+            return Result.fail("书签不存在或无权限访问");
+        }
+
+        // 增加使用次数
+        boolean success = bookmarkService.incrementUsageCount(id, userId);
+
+        if (success) {
+            return Result.success("书签使用次数增加成功");
+        } else {
+            return Result.fail("书签使用次数增加失败");
+        }
+    }
+
+
+    /**
+     * 获取最常使用的书签
+     *
+     * @return pres.peixinyi.sinan.common.Result<java.util.List<pres.peixinyi.sinan.dto.response.BookmarkVO>>
+     * @author peixinyi
+     * @since 20:45 2025/8/13
+     */
+    @GetMapping("/most-visited")
+    public Result<List<BookmarkResp>> getMostVisitedBookmarks(
+            @RequestHeader("X-Access-Key") String accessKey,
+            @RequestParam(value = "limit", defaultValue = "10") int limit,
+            @RequestParam(value = "search", required = false) String search) {
+        String userId = authenticateUser(accessKey);
+        if (userId == null) {
+            return Result.fail("无效的访问密钥");
+        }
+        // 获取最常访问的书签
+        List<SnBookmark> bookmarks = bookmarkService.getMostVisitedBookmarks(limit, search, userId);
+
+        if (bookmarks.isEmpty()) {
+            return Result.success(List.of());
+        }
+
+        // 批量获取书签的标签信息
+        List<String> bookmarkIds = bookmarks.stream()
+                .map(SnBookmark::getId)
+                .toList();
+        Map<String, List<SnTag>> bookmarkTagsMap =
+                bookmarkService.getBatchBookmarkTags(bookmarkIds);
+
+        // 构建响应对象，包含标签信息
+        List<BookmarkResp> bookmarkResponses = bookmarks.stream()
+                .map(bookmark -> {
+                    List<SnTag> tags =
+                            bookmarkTagsMap.getOrDefault(bookmark.getId(), List.of());
+                    return BookmarkResp.from(bookmark, tags);
+                })
+                .toList();
+
+        return Result.success(bookmarkResponses);
+    }
+
 }
