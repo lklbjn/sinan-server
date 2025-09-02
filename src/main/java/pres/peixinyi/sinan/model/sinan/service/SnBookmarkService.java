@@ -750,6 +750,8 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
                         .like(SnBookmark::getUrl, trim)
                         .or()
                         .like(SnBookmark::getPinyin, trim)
+                        .or()
+                        .like(SnBookmark::getAbbreviation, trim)
                 )
                 .orderByDesc(SnBookmark::getUpdateTime)
                 .list();
