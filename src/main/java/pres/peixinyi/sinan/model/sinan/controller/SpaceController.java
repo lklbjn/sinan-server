@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.*;
 import pres.peixinyi.sinan.common.Result;
 import pres.peixinyi.sinan.dto.request.AddSpaceReq;
@@ -11,8 +12,10 @@ import pres.peixinyi.sinan.dto.request.EditSpaceReq;
 import pres.peixinyi.sinan.dto.request.SpaceDragSortReq;
 import pres.peixinyi.sinan.dto.response.SpaceResp;
 import pres.peixinyi.sinan.dto.response.SpaceSimpleResp;
+import pres.peixinyi.sinan.model.sinan.entity.SnShareSpaceAssUser;
 import pres.peixinyi.sinan.model.sinan.entity.SnSpace;
 import pres.peixinyi.sinan.model.sinan.service.SnBookmarkService;
+import pres.peixinyi.sinan.model.sinan.service.SnShareSpaceAssUserService;
 import pres.peixinyi.sinan.model.sinan.service.SnSpaceService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 
@@ -31,8 +34,12 @@ public class SpaceController {
 
     @Resource
     SnSpaceService spaceService;
-    @Autowired
-    private SnBookmarkService snBookmarkService;
+
+    @Resource
+    SnBookmarkService snBookmarkService;
+
+    @Resource
+    SnShareSpaceAssUserService snShareSpaceAssUserService;
 
     /**
      * 分页获取用户的所有空间
@@ -72,12 +79,19 @@ public class SpaceController {
     @GetMapping("/{id}")
     public Result<SpaceResp> getSpaceById(@PathVariable("id") String id) {
         String currentUserId = StpUtil.getLoginIdAsString();
-
         SnSpace space = spaceService.getNamespaceByUserAndId(id, currentUserId);
-        if (space == null) {
-            return Result.fail("空间不存在或无权限访问");
+        if (!ObjectUtils.isEmpty(space)) {
+            return Result.success(SpaceResp.from(space));
         }
-
+        if (space == null) {
+            List<SnShareSpaceAssUser> shareSpaceAssUsers = snShareSpaceAssUserService.getByUserId(currentUserId);
+            List<String> spaceIds = shareSpaceAssUsers.stream().map(SnShareSpaceAssUser::getSpaceId).toList();
+            if (spaceIds.contains(id)) {
+                space = spaceService.getById(id);
+            } else {
+                return Result.fail("空间不存在或无权限查看");
+            }
+        }
         return Result.success(SpaceResp.from(space));
     }
 
