@@ -37,13 +37,13 @@ RUN echo 'Asia/Shanghai' > /etc/timezone && \
 
 # 创建并设置日志目录
 RUN mkdir -p /app/logs && \
-    chown -R sinan:sinan /app/logs
+    chown -R sinan:sinan /app/logs \
 
 # 暴露端口
 EXPOSE 8080
 
 # 挂载配置文件和日志目录
-VOLUME ["/resources", "/app/logs"]
+VOLUME ["/resources", "/app/logs", "/upload"]
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \

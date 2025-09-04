@@ -111,6 +111,11 @@
             <artifactId>webauthn-server-core</artifactId>
             <version>2.7.0</version>
         </dependency>
+        <dependency>
+            <groupId>net.coobird</groupId>
+            <artifactId>thumbnailator</artifactId>
+            <version>0.4.20</version>
+        </dependency>
     </dependencies>
 
     <build>

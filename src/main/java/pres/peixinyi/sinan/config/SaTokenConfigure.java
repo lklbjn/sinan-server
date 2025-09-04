@@ -28,6 +28,7 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                         "/user/passkey/login/options",
                         "/user/passkey/login",
                         "/user/login",
+                        "/user/doLogin",
                         "/user/register",
                         "/user/github/oauth2/*",
                         "/actuator/health",
