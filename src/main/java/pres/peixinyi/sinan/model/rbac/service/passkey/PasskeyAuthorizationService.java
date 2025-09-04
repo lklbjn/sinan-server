@@ -20,6 +20,7 @@ import pres.peixinyi.sinan.model.rbac.service.SnUserCredentialService;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -181,6 +182,7 @@ public class PasskeyAuthorizationService {
                                        @NotNull AssertionResult result) {
         var entity = passKeyService.getByCredentialId(credentialId);
         entity.setSignCount(result.getSignatureCount());
+        entity.setLastUsed(new Date());
         passKeyService.saveOrUpdate(entity);
         return entity;
     }
@@ -206,6 +208,7 @@ public class PasskeyAuthorizationService {
                 .signCount(result.getSignatureCount())
                 .userHandle(request.getUser().getId())
                 .describe(describe)
+                .createTime(new Date())
                 .build();
     }
 
