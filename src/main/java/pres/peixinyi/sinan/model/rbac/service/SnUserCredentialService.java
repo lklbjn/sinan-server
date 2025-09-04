@@ -1,15 +1,16 @@
 package pres.peixinyi.sinan.model.rbac.service;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
+import pres.peixinyi.sinan.model.rbac.domain.CredentialType;
+import pres.peixinyi.sinan.model.rbac.entity.SnUserCredential;
+import pres.peixinyi.sinan.model.rbac.exception.UserRuntionException;
+import pres.peixinyi.sinan.model.rbac.mapper.SnUserCredentialMapper;
 
 import java.util.Date;
-
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import pres.peixinyi.sinan.model.rbac.domain.CredentialType;
-import pres.peixinyi.sinan.model.rbac.mapper.SnUserCredentialMapper;
-import pres.peixinyi.sinan.model.rbac.entity.SnUserCredential;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class SnUserCredentialService extends ServiceImpl<SnUserCredentialMapper, SnUserCredential> {
@@ -188,5 +189,20 @@ public class SnUserCredentialService extends ServiceImpl<SnUserCredentialMapper,
                 .eq(SnUserCredential::getUserId, userId)
                 .last("limit 1")
                 .one();
+    }
+
+    public Map<CredentialType, SnUserCredential> getCredentialByUserId(String userId) {
+        return lambdaQuery()
+                .eq(SnUserCredential::getUserId, userId)
+                .list()
+                .stream()
+                .collect(Collectors.toMap(item -> CredentialType.from(item.getCredentialType()), Function.identity()));
+    }
+
+    public String getUserIdByEmail(String email) {
+        return lambdaQuery()
+                .eq(SnUserCredential::getCredentialType, CredentialType.EMAIL)
+                .eq(SnUserCredential::getCredential, email)
+                .oneOpt().map(SnUserCredential::getUserId).orElseThrow(() -> new UserRuntionException("用户不存在"));
     }
 }

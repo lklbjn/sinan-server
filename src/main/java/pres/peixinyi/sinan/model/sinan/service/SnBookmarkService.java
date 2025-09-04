@@ -156,7 +156,7 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
      * @param namespaceId 命名空间ID
      * @return true 更新成功，false 更新失败
      */
-    public boolean updateBookmarkByUser(String bookmarkId, String userId, String name, String url, String description, String namespaceId) {
+    public boolean updateBookmarkByUser(String bookmarkId, String userId, String name, String url, String icon, String description, String namespaceId) {
         return lambdaUpdate()
                 .eq(SnBookmark::getId, bookmarkId)
                 .eq(SnBookmark::getUserId, userId)
@@ -165,6 +165,7 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
                 .set(name != null, SnBookmark::getPinyin, PinyinUtils.toPinyin(name))
                 .set(name != null, SnBookmark::getAbbreviation, PinyinUtils.toPinyinFirstLetter(name))
                 .set(url != null, SnBookmark::getUrl, url)
+                .set(icon != null, SnBookmark::getIcon, icon)
                 .set(description != null, SnBookmark::getDescription, description)
                 .set(namespaceId != null, SnBookmark::getSpaceId, namespaceId)
                 .set(SnBookmark::getUpdateTime, new Date())

@@ -3,6 +3,11 @@ package pres.peixinyi.sinan.model.sinan.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.annotation.Resource;
+import net.coobird.thumbnailator.Thumbnails;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import pres.peixinyi.sinan.common.Result;
@@ -14,7 +19,14 @@ import pres.peixinyi.sinan.model.sinan.entity.SnBookmark;
 import pres.peixinyi.sinan.model.sinan.entity.SnBookmarkAssTag;
 import pres.peixinyi.sinan.model.sinan.entity.SnTag;
 import pres.peixinyi.sinan.model.sinan.service.*;
+import pres.peixinyi.sinan.config.UploadProperties;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -45,6 +57,12 @@ public class BookmarkController {
 
     @Resource
     SnShareSpaceAssUserService snShareSpaceAssUserService;
+
+    @Resource
+    UploadProperties uploadProperties;
+
+    @Value("${sinan.server.base-url}")
+    private String baseUrl;
 
     /**
      * 增加书签使用次数
@@ -317,7 +335,7 @@ public class BookmarkController {
             return Result.fail("书签ID不能为空");
         }
 
-        // 检查书签是否存��且属于当前用户
+        // 检查书签是否存在且属于当前用户
         SnBookmark existingBookmark = bookmarkService.getBookmarkByUserAndId(req.getId(), currentUserId);
         if (existingBookmark == null) {
             return Result.fail("书签不存在或无权限编辑");
@@ -341,6 +359,7 @@ public class BookmarkController {
                 currentUserId,
                 req.getName(),
                 req.getUrl(),
+                req.getIcon(),
                 req.getDescription(),
                 req.getNamespaceId()
         );
@@ -635,6 +654,161 @@ public class BookmarkController {
         stats.setTotalCount(totalCount);
 
         return Result.success(stats);
+    }
+
+    /**
+     * 上传书签图标
+     *
+     * @param file 上传的图片文件
+     * @return 上传结果，包含图片的访问路径
+     * @author peixinyi
+     * @since 2025/9/4
+     */
+    @PostMapping("/upload/icon")
+    public Result<String> uploadIcon(@RequestParam("file") MultipartFile file) {
+        // 参数校验
+        if (file == null || file.isEmpty()) {
+            return Result.fail("请选择要上传的图片");
+        }
+
+        // 检查文件类型
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null) {
+            return Result.fail("文件名不能为空");
+        }
+
+        String lowerCaseFilename = originalFilename.toLowerCase();
+        if (!lowerCaseFilename.endsWith(".jpg") && !lowerCaseFilename.endsWith(".jpeg")
+            && !lowerCaseFilename.endsWith(".png") && !lowerCaseFilename.endsWith(".gif")
+            && !lowerCaseFilename.endsWith(".bmp") && !lowerCaseFilename.endsWith(".webp")) {
+            return Result.fail("只支持 JPG、PNG、GIF、BMP、WEBP 格式的图片");
+        }
+
+        // 检查文件大小（限制为5MB）
+        if (file.getSize() > 5 * 1024 * 1024) {
+            return Result.fail("图片大小不能超过5MB");
+        }
+
+        try {
+            // 读取图片
+            BufferedImage srcImg = ImageIO.read(file.getInputStream());
+            if (srcImg == null) {
+                return Result.fail("图片格式不正确或已损坏");
+            }
+
+            // 获取图片的宽高
+            int width = srcImg.getWidth();
+            int height = srcImg.getHeight();
+
+            // 计算裁剪区域（取中心正方形区域）
+            int size = Math.min(width, height);
+            int x = (width - size) / 2;
+            int y = (height - size) / 2;
+
+            // 裁剪为正方形
+            BufferedImage squareImg = srcImg.getSubimage(x, y, size, size);
+
+            // 压缩为256x256并转换为PNG格式
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            Thumbnails.of(squareImg)
+                    .size(256, 256)
+                    .outputFormat("png")
+                    .outputQuality(0.8)
+                    .toOutputStream(out);
+
+            // 生成文件名
+            String fileName = "icon_" + System.currentTimeMillis() + ".png";
+
+            // 使用配置的上传路径
+            Path uploadDir = Paths.get(uploadProperties.getIconUploadPath());
+            Files.createDirectories(uploadDir);
+
+            Path savePath = uploadDir.resolve(fileName);
+            Files.write(savePath, out.toByteArray());
+
+            // 返回完整的图片访问URL
+            String iconUrl = uploadProperties.getIconFullUrl(baseUrl, fileName);
+            return Result.success(iconUrl);
+
+        } catch (Exception e) {
+            return Result.fail("图片处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 读取书签图标
+     *
+     * @param fileName 图标文件名
+     * @return 图标文件的字节流
+     * @author peixinyi
+     * @since 2025/9/4
+     */
+    @GetMapping("/icons/{fileName}")
+    public ResponseEntity<byte[]> getIcon(@PathVariable("fileName") String fileName) {
+        try {
+            // 参数校验
+            if (fileName == null || fileName.isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // 安全检查：防止路径遍历攻击
+            if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // 检查文件扩展名
+            if (!fileName.toLowerCase().endsWith(".png") && !fileName.toLowerCase().endsWith(".jpg")
+                && !fileName.toLowerCase().endsWith(".jpeg") && !fileName.toLowerCase().endsWith(".gif")
+                && !fileName.toLowerCase().endsWith(".bmp") && !fileName.toLowerCase().endsWith(".webp")) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // 构建文件路径
+            Path filePath = Paths.get(uploadProperties.getIconUploadPath()).resolve(fileName);
+
+            // 检查文件是否存在
+            if (!Files.exists(filePath)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // 读取文件内容
+            byte[] fileContent = Files.readAllBytes(filePath);
+
+            // 根据文件扩展名设置Content-Type
+            String contentType = getContentType(fileName);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .contentLength(fileContent.length)
+                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000") // 缓存一年
+                    .body(fileContent);
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * 根据文件名获取Content-Type
+     *
+     * @param fileName 文件名
+     * @return Content-Type
+     */
+    private String getContentType(String fileName) {
+        String lowerCaseFileName = fileName.toLowerCase();
+        if (lowerCaseFileName.endsWith(".png")) {
+            return "image/png";
+        } else if (lowerCaseFileName.endsWith(".jpg") || lowerCaseFileName.endsWith(".jpeg")) {
+            return "image/jpeg";
+        } else if (lowerCaseFileName.endsWith(".gif")) {
+            return "image/gif";
+        } else if (lowerCaseFileName.endsWith(".bmp")) {
+            return "image/bmp";
+        } else if (lowerCaseFileName.endsWith(".webp")) {
+            return "image/webp";
+        } else {
+            return "application/octet-stream";
+        }
     }
 
     /**

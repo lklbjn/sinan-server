@@ -23,7 +23,12 @@ public class SaTokenConfigure implements WebMvcConfigurer {
         registry.addInterceptor(new SaInterceptor(handle -> StpUtil.checkLogin()))
                 .addPathPatterns("/**")
                 .excludePathPatterns(
+                        "/user/passkey/registration/options",
+                        "/user/passkey/registration",
+                        "/user/passkey/login/options",
+                        "/user/passkey/login",
                         "/user/login",
+                        "/user/doLogin",
                         "/user/register",
                         "/user/github/oauth2/*",
                         "/actuator/health",
