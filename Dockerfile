@@ -37,7 +37,7 @@ RUN echo 'Asia/Shanghai' > /etc/timezone && \
 
 # 创建并设置日志目录
 RUN mkdir -p /app/logs && \
-    chown -R sinan:sinan /app/logs \
+    chown -R sinan:sinan /app/logs
 
 # 暴露端口
 EXPOSE 8080
