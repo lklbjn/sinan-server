@@ -3,6 +3,7 @@ package pres.peixinyi.sinan.model.sinan.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -39,6 +40,7 @@ import java.util.Map;
  * @Date : 2025/8/13 20:39
  * @Version : 0.0.0
  */
+@Slf4j
 @RestController
 @RequestMapping("/bookmark")
 public class BookmarkController {
@@ -679,8 +681,8 @@ public class BookmarkController {
 
         String lowerCaseFilename = originalFilename.toLowerCase();
         if (!lowerCaseFilename.endsWith(".jpg") && !lowerCaseFilename.endsWith(".jpeg")
-            && !lowerCaseFilename.endsWith(".png") && !lowerCaseFilename.endsWith(".gif")
-            && !lowerCaseFilename.endsWith(".bmp") && !lowerCaseFilename.endsWith(".webp")) {
+                && !lowerCaseFilename.endsWith(".png") && !lowerCaseFilename.endsWith(".gif")
+                && !lowerCaseFilename.endsWith(".bmp") && !lowerCaseFilename.endsWith(".webp")) {
             return Result.fail("只支持 JPG、PNG、GIF、BMP、WEBP 格式的图片");
         }
 
@@ -758,8 +760,8 @@ public class BookmarkController {
 
             // 检查文件扩展名
             if (!fileName.toLowerCase().endsWith(".png") && !fileName.toLowerCase().endsWith(".jpg")
-                && !fileName.toLowerCase().endsWith(".jpeg") && !fileName.toLowerCase().endsWith(".gif")
-                && !fileName.toLowerCase().endsWith(".bmp") && !fileName.toLowerCase().endsWith(".webp")) {
+                    && !fileName.toLowerCase().endsWith(".jpeg") && !fileName.toLowerCase().endsWith(".gif")
+                    && !fileName.toLowerCase().endsWith(".bmp") && !fileName.toLowerCase().endsWith(".webp")) {
                 return ResponseEntity.badRequest().build();
             }
 
@@ -770,7 +772,7 @@ public class BookmarkController {
             if (!Files.exists(filePath)) {
                 return ResponseEntity.notFound().build();
             }
-
+            log.info("读取图标文件: {}", filePath.toString());
             // 读取文件内容
             byte[] fileContent = Files.readAllBytes(filePath);
 
