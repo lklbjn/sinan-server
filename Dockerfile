@@ -39,11 +39,14 @@ RUN echo 'Asia/Shanghai' > /etc/timezone && \
 RUN mkdir -p /app/logs && \
     chown -R sinan:sinan /app/logs
 
+RUN mkdir -p /app/upload && \
+    chown -R sinan:sinan /app/upload
+
 # 暴露端口
 EXPOSE 8080
 
 # 挂载配置文件和日志目录
-VOLUME ["/resources", "/app/logs", "/upload"]
+VOLUME ["/resources", "/app/logs", "app/upload"]
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
