@@ -2,7 +2,10 @@ package pres.peixinyi.sinan.model.rbac.controller;
 
 import cn.dev33.satoken.stp.SaTokenInfo;
 import cn.dev33.satoken.stp.StpUtil;
+import com.yubico.webauthn.exception.AssertionFailedException;
+import com.yubico.webauthn.exception.RegistrationFailedException;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -10,16 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import pres.peixinyi.sinan.common.Result;
-import pres.peixinyi.sinan.dto.request.ChangePasswordReq;
-import pres.peixinyi.sinan.dto.request.CreateUserKeyReq;
-import pres.peixinyi.sinan.dto.request.UserDataImportReq;
-import pres.peixinyi.sinan.dto.request.UserLoginReq;
-import pres.peixinyi.sinan.dto.request.UserRegisterReq;
-import pres.peixinyi.sinan.dto.response.UserResp;
-import pres.peixinyi.sinan.dto.response.UserKeyResp;
-import pres.peixinyi.sinan.dto.response.UserDataExportResp;
-import pres.peixinyi.sinan.dto.response.UserDataImportResp;
-import pres.peixinyi.sinan.dto.response.UserLoginResp;
+import pres.peixinyi.sinan.dto.request.*;
+import pres.peixinyi.sinan.dto.response.*;
 import pres.peixinyi.sinan.model.rbac.entity.SnUser;
 import pres.peixinyi.sinan.model.rbac.service.UserDataExportService;
 import pres.peixinyi.sinan.model.rbac.service.SnUserService;
@@ -27,7 +22,9 @@ import pres.peixinyi.sinan.model.rbac.service.SnUserCredentialService;
 import pres.peixinyi.sinan.model.rbac.service.SnUserKeyService;
 import pres.peixinyi.sinan.model.rbac.entity.SnUserKey;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import pres.peixinyi.sinan.model.rbac.service.passkey.PasskeyAuthorizationService;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -55,6 +52,9 @@ public class UserController {
 
     @Resource
     private SnUserKeyService snUserKeyService;
+
+    @Resource
+    private PasskeyAuthorizationService passkeyAuthorizationService;
 
     /**
      * 用户注册
@@ -438,6 +438,167 @@ public class UserController {
 
         } catch (Exception e) {
             return Result.fail("删除用户Key失败: " + e.getMessage());
+        }
+    }
+
+
+    /**
+     * 获取Passkey注册选项
+     *
+     * @return pres.peixinyi.sinan.common.Result<java.lang.String>
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 14:35 2025/8/29
+     */
+    @GetMapping("/passkey/registration/options")
+    public Result<String> getPasskeyRegistrationOptions() {
+        try {
+            String options = passkeyAuthorizationService.startPasskeyRegistration();
+            if (options.isEmpty()) {
+                return Result.fail("Failed to generate registration options");
+            }
+            return Result.ok(options);
+        } catch (Exception e) {
+            return Result.fail("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Passkey注册
+     *
+     * @param request
+     * @return pres.peixinyi.sinan.common.Result<java.lang.String>
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 14:35 2025/8/29
+     */
+    @PostMapping("/passkey/registration")
+    public Result<String> verifyPasskeyRegistration(@RequestBody PasskeyRegistrationRequest request) {
+        try {
+            passkeyAuthorizationService.finishPasskeyRegistration(request);
+            return Result.ok("Passkey registration successful");
+        } catch (IOException e) {
+            return Result.fail("Invalid credential format");
+        } catch (RegistrationFailedException e) {
+            return Result.fail("Registration failed: " + e.getMessage());
+        } catch (Exception e) {
+            return Result.fail("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取Passkey登录选项
+     *
+     * @param httpServletRequest
+     * @return pres.peixinyi.sinan.common.Result<java.lang.String>
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 14:35 2025/8/29
+     */
+    @GetMapping("/passkey/login/options")
+    public Result<String> getPasskeyAssertionOptions(HttpServletRequest httpServletRequest) {
+        try {
+            String sessionId = httpServletRequest.getSession().getId();
+            String options = passkeyAuthorizationService.startPasskeyAssertion(sessionId);
+            return Result.ok(options);
+        } catch (Exception e) {
+            return Result.fail("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Passkey登录
+     *
+     * @param httpServletRequest
+     * @param httpServletResponse
+     * @param credential
+     * @return pres.peixinyi.sinan.common.Result<java.lang.Object>
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 14:35 2025/8/29
+     */
+    @PostMapping("/passkey/login")
+    public Result<UserLoginResp> verifyPasskeyAssertion(HttpServletRequest httpServletRequest,
+                                                        @RequestBody String credential) {
+        try {
+            String sessionId = httpServletRequest.getSession().getId();
+            var auth = passkeyAuthorizationService.finishPasskeyAssertion(sessionId, credential);
+
+            // 获取用户信息
+            var user = userService.getUserById(auth.getUserId());
+            if (user == null) {
+                return Result.fail("User not found");
+            }
+
+            // 执行登录
+            StpUtil.login(auth.getUserId());
+            SaTokenInfo tokenInfo = StpUtil.getTokenInfo();
+
+            // 构建响应
+            UserLoginResp loginResp = UserLoginResp.create(user, tokenInfo);
+
+            return Result.success(loginResp);
+        } catch (IOException e) {
+            return Result.fail("Invalid credential format");
+        } catch (AssertionFailedException e) {
+            return Result.fail("Authentication failed: " + e.getMessage());
+        } catch (Exception e) {
+            return Result.fail("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取Passkey列表
+     *
+     * @return pres.peixinyi.sinan.common.Result<java.util.List < pres.peixinyi.sinan.dto.response.PasskeyResp>>
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 16:45 2025/8/29
+     */
+    @GetMapping("/passkeys")
+    public Result<List<PasskeyResp>> getPasskeyList() {
+        try {
+            return Result.ok(passkeyAuthorizationService.getPasskeyList());
+        } catch (Exception e) {
+            return Result.fail("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 更新Passkey描述
+     *
+     * @param req
+     * @return pres.peixinyi.sinan.common.Result<java.lang.String>
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 16:50 2025/8/29
+     */
+    @PatchMapping("/passkey/describe")
+    public Result<String> updatePasskeyDescribe(@RequestBody EditPasskeyDescribeReq req) {
+        try {
+            passkeyAuthorizationService.updatePasskeyDescribe(req);
+            return Result.ok();
+        } catch (Exception e) {
+            return Result.fail("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 删除Passkey
+     *
+     * @param passkeyId
+     * @return pres.peixinyi.sinan.common.Result<java.lang.String>
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 16:52 2025/8/29
+     */
+    @DeleteMapping("/passkey/{passkeyId}")
+    public Result<String> deletePasskey(@PathVariable("passkeyId") Long passkeyId) {
+        try {
+            passkeyAuthorizationService.deletePasskey(passkeyId);
+            return Result.ok();
+        } catch (Exception e) {
+            return Result.fail("Error: " + e.getMessage());
         }
     }
 }

@@ -10,18 +10,21 @@ Sinan Server 是一个基于 Spring Boot 3 开发的现代化书签管理系统�
 ## ✨ 功能特性
 
 ### 🔖 书签管理
+
 - **书签收藏**：支持网页书签的添加、编辑、删除
 - **书签导入**：支持从浏览器导入书签文件
 - **使用统计**：记录书签访问次数，智能推荐
 - **快速搜索**：支持书签标题、URL、描述的全文搜索
 
 ### 🏷️ 分类与标签
+
 - **空间管理**：创建不同的书签空间进行分类
 - **标签系统**：为书签添加多个标签，支持标签统计
 - **拖拽排序**：支持空间和标签的拖拽排序
 - **层级管理**：支持空间和标签的层级结构
 
 ### 👥 用户与分享
+
 - **用户认证**：基于 Sa-Token 的安全认证体系
 - **GitHub OAuth**：支持 GitHub 第三方登录
 - **API 密钥认证**：支持基于用户密钥的 API 访问控制
@@ -29,6 +32,7 @@ Sinan Server 是一个基于 Spring Boot 3 开发的现代化书签管理系统�
 - **权限控制**：细粒度的用户权限管理
 
 ### 🔧 技术特性
+
 - **RESTful API**：标准的 REST 接口设计
 - **数据缓存**：Redis 缓存提升性能
 - **逻辑删除**：数据安全的软删除机制
@@ -38,20 +42,24 @@ Sinan Server 是一个基于 Spring Boot 3 开发的现代化书签管理系统�
 ## 🏗️ 技术栈
 
 ### 后端框架
+
 - **Spring Boot 3.2.4** - 现代化的 Java 企业应用框架
 - **Spring Web** - Web 层框架
 - **Spring Validation** - 参数校验框架
 
 ### 数据存储
+
 - **MySQL 8.0+** - 关系型数据库
 - **MyBatis Plus 3.5.12** - 持久层框架
 - **Redis** - 缓存数据库
 
 ### 安全认证
+
 - **Sa-Token 1.44.0** - 轻量级权限认证框架
 - **GitHub OAuth2** - 第三方登录集成
 
 ### 工具库
+
 - **Lombok** - 简化 Java 代码
 - **Fastjson2** - JSON 处理库
 - **OkHttp** - HTTP 客户端
@@ -79,26 +87,40 @@ Sinan Server 是一个基于 Spring Boot 3 开发的现代化书签管理系统�
    ```
 
 3. **修改配置**
-   
-   编辑 `src/main/resources/application-dev.yaml`：
-   ```yaml
-   spring:
-     datasource:
-       url: jdbc:mysql://localhost:3306/sinan_dev?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-       username: your_username
-       password: your_password
-     data:
-       redis:
-         host: 127.0.0.1
-         port: 6379
-         password: your_redis_password
-   
-   github:
-     oauth2:
-       client-id: your_github_client_id
-       client-secret: your_github_client_secret
-       redirect-uri: http://localhost/github-callback
-   ```
+
+编辑 `src/main/resources/application-dev.yaml`：
+
+```yaml
+  spring:
+    datasource:
+      url: jdbc:mysql://localhost:3306/sinan_dev?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+      username: your_username
+      password: your_password
+    data:
+      redis:
+        host: 127.0.0.1
+        port: 6379
+        password: your_redis_password
+
+  github:
+    oauth2:
+      client-id: your_github_client_id
+      client-secret: your_github_client_secret
+      redirect-uri: http://localhost/github-callback
+  sinan:
+    server:
+      base-url: http://localhost:8080
+    upload:
+      base-path: /path/to/upload/directory
+      icon-path: /path/to/icon/directory
+      url-prefix: http://localhost/uploads
+    passkey:
+      id: localhost
+      name: sinan
+      origin:
+        - http://localhost
+        - http://localhost:8080
+```
 
 4. **运行项目**
    ```bash
@@ -109,12 +131,12 @@ Sinan Server 是一个基于 Spring Boot 3 开发的现代化书签管理系统�
    ```
 
 5. **访问服务**
-   
+
    服务启动后访问：`http://localhost:8080/api`
 
 ### Docker 部署
 
-1. **使用 Docker Compose（推荐）**
+1. **使用 Docker Compose（推荐）** [完整教程](https://sinan.host/docs/guide/deployment.html)
    ```bash
    # 启动完整环境（应用 + MySQL + Redis）
    docker-compose up -d
@@ -144,53 +166,53 @@ Sinan Server 是一个基于 Spring Boot 3 开发的现代化书签管理系统�
 
 ### API 密钥认证 API
 
-| 方法 | 路径 | 描述 | 认证方式 |
-|------|------|------|----------|
-| POST | `/api/bookmark` | 添加书签 | X-Access-Key |
-| GET | `/api/bookmark` | 获取书签树 | X-Access-Key |
+| 方法   | 路径              | 描述    | 认证方式         |
+|------|-----------------|-------|--------------|
+| POST | `/api/bookmark` | 添加书签  | X-Access-Key |
+| GET  | `/api/bookmark` | 获取书签树 | X-Access-Key |
 
 > 💡 **API 密钥认证**: 新增基于用户密钥的 API 访问方式，通过 `X-Access-Key` 请求头进行认证。
 
 ### 书签管理 API
 
-| 方法 | 路径 | 描述 |
-|------|------|------|
-| POST | `/api/bookmark` | 添加书签 |
-| PUT | `/api/bookmark` | 编辑书签 |
-| DELETE | `/api/bookmark/{id}` | 删除书签 |
-| GET | `/api/bookmark/list` | 获取书签列表 |
-| POST | `/api/bookmark/import` | 导入书签文件 |
-| PUT | `/api/bookmark/{id}/usage` | 增加使用次数 |
+| 方法     | 路径                         | 描述     |
+|--------|----------------------------|--------|
+| POST   | `/api/bookmark`            | 添加书签   |
+| PUT    | `/api/bookmark`            | 编辑书签   |
+| DELETE | `/api/bookmark/{id}`       | 删除书签   |
+| GET    | `/api/bookmark/list`       | 获取书签列表 |
+| POST   | `/api/bookmark/import`     | 导入书签文件 |
+| PUT    | `/api/bookmark/{id}/usage` | 增加使用次数 |
 
 ### 空间管理 API
 
-| 方法 | 路径 | 描述 |
-|------|------|------|
-| POST | `/api/space` | 创建空间 |
-| PUT | `/api/space` | 编辑空间 |
-| DELETE | `/api/space/{id}` | 删除空间 |
-| GET | `/api/space/list` | 获取空间列表 |
-| PUT | `/api/space/sort` | 空间排序 |
+| 方法     | 路径                | 描述     |
+|--------|-------------------|--------|
+| POST   | `/api/space`      | 创建空间   |
+| PUT    | `/api/space`      | 编辑空间   |
+| DELETE | `/api/space/{id}` | 删除空间   |
+| GET    | `/api/space/list` | 获取空间列表 |
+| PUT    | `/api/space/sort` | 空间排序   |
 
 ### 标签管理 API
 
-| 方法 | 路径 | 描述 |
-|------|------|------|
-| POST | `/api/tag` | 创建标签 |
-| PUT | `/api/tag` | 编辑标签 |
-| DELETE | `/api/tag/{id}` | 删除标签 |
-| GET | `/api/tag/list` | 获取标签列表 |
-| PUT | `/api/tag/sort` | 标签排序 |
+| 方法     | 路径              | 描述     |
+|--------|-----------------|--------|
+| POST   | `/api/tag`      | 创建标签   |
+| PUT    | `/api/tag`      | 编辑标签   |
+| DELETE | `/api/tag/{id}` | 删除标签   |
+| GET    | `/api/tag/list` | 获取标签列表 |
+| PUT    | `/api/tag/sort` | 标签排序   |
 
 ### 用户管理 API
 
-| 方法 | 路径 | 描述 |
-|------|------|------|
-| GET | `/api/user/info` | 获取用户信息 |
+| 方法   | 路径                       | 描述        |
+|------|--------------------------|-----------|
+| GET  | `/api/user/info`         | 获取用户信息    |
 | POST | `/api/user/github-login` | GitHub 登录 |
-| POST | `/api/user/logout` | 用户登出 |
-| POST | `/api/user/key` | 创建用户密钥 |
-| GET | `/api/user/keys` | 获取用户密钥列表 |
+| POST | `/api/user/logout`       | 用户登出      |
+| POST | `/api/user/key`          | 创建用户密钥    |
+| GET  | `/api/user/keys`         | 获取用户密钥列表  |
 
 ## 📁 项目结构
 
@@ -261,6 +283,7 @@ sinan-server/
 ### 缓存配置
 
 使用 Redis 进行数据缓存，提升系统性能：
+
 - 用户会话缓存
 - 热点数据缓存
 - 计数器缓存
@@ -268,6 +291,7 @@ sinan-server/
 ### 安全配置
 
 基于 Sa-Token 实现：
+
 - JWT Token 认证
 - 接口权限控制
 - 跨域请求处理
@@ -277,6 +301,7 @@ sinan-server/
 项目集成了完整的 CI/CD 流程，支持自动化构建和部署：
 
 ### GitHub Actions 特性
+
 - ✅ 自动构建 Java 应用
 - ✅ 运行单元测试
 - ✅ 构建 Docker 镜像
@@ -284,6 +309,7 @@ sinan-server/
 - ✅ 生成构建产物（JAR + Docker 镜像）
 
 ### 部署方式
+
 1. **阿里云容器镜像服务**：`registry.cn-hangzhou.aliyuncs.com/yixing-tech/sinan-server`
 2. **GitHub Artifacts**：JAR 文件和 Docker 镜像离线包
 
@@ -300,6 +326,7 @@ sinan-server/
 5. 创建 Pull Request
 
 ### 代码规范
+
 - 遵循 Java 代码规范
 - 添加必要的注释和文档
 - 编写单元测试
@@ -307,7 +334,13 @@ sinan-server/
 
 ## 📝 更新日志
 
+### v1.1.0(2025-09-05)
+
+- 允许上传书签图标支持url,base64,文件上传
+- 实现PassKey 支持
+
 ### v1.0.0 (2025-08-20)
+
 - ✨ 初始版本发布
 - 🔖 实现书签管理功能
 - 🏷️ 实现标签和空间管理
@@ -318,14 +351,17 @@ sinan-server/
 ## 📄 许可证
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+[开源许可证](https://sinan.host/docs/guide/open-source-license.html)
 
 ## 👨‍💻 作者
 
-**PeiXinyi** - *项目创建者* - [GitHub](https://github.com/peixinyi)
+**PeiXinyi** - *项目创建者* - [GitHub](https://github.com/peixinyi) - [个人网站](https://peixinyi.com)
+
 
 ## 🙏 致谢
 
 感谢以下开源项目的支持：
+
 - [Spring Boot](https://spring.io/projects/spring-boot)
 - [MyBatis Plus](https://baomidou.com/)
 - [Sa-Token](https://sa-token.cc/)

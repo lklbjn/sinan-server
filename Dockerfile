@@ -43,7 +43,7 @@ RUN mkdir -p /app/logs && \
 EXPOSE 8080
 
 # 挂载配置文件和日志目录
-VOLUME ["/resources", "/app/logs"]
+VOLUME ["/resources", "/app/logs", "/upload"]
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \

@@ -29,6 +29,8 @@ public class EditBookmarkReq {
      */
     private String url;
 
+    private String icon;
+
     /**
      * 书签描述
      */
