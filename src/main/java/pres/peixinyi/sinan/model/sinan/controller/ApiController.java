@@ -544,4 +544,35 @@ public class ApiController {
         return "image/png";
     }
 
+    /**
+     * 获取用户的所有空间
+     *
+     * @param accessKey     访问密钥
+     * @return 空间列表
+     */
+    @GetMapping("/spaces")
+    public Result<List<SnSpace>> getAllSpaces(
+            @RequestHeader(value = "X-Access-Key", required = false) String accessKey) {
+
+        // 支持两种认证方式：1. X-Access-Key 2. Authorization (SA-Token)
+        String userId = null;
+
+        // 优先使用X-Access-Key认证
+        if (accessKey != null && !accessKey.trim().isEmpty()) {
+            userId = authenticateUser(accessKey);
+        }
+
+        // 两种认证方式都失败
+        if (userId == null) {
+            return Result.fail("无效的访问密钥");
+        }
+
+        try {
+            List<SnSpace> spaces = spaceService.getUserSpaces(userId);
+            return Result.success(spaces);
+        } catch (Exception e) {
+            return Result.fail("获取空间列表失败: " + e.getMessage());
+        }
+    }
+
 }
