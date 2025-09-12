@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.yubico.webauthn.data.ByteArray;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -18,6 +20,8 @@ import java.util.Date;
  */
 @Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @TableName(value = "sn_pass_key")
 public class SnPassKey implements Serializable {
     @Serial
