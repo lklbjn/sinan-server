@@ -395,9 +395,11 @@ public class FaviconExtractor {
             }
             
             // 方法2: 解析HTML获取各种图标（类似Python的parse_html_for_icons）
-            String htmlContent = fetchHtmlContent(finalUrl);
+            // 使用实际的HTML响应URL作为baseUrl，而不是重定向后的URL
+            String htmlContent = fetchHtmlContentWithUrl(finalUrl);
             if (htmlContent != null) {
-                List<String> iconUrls = parseHtmlForIcons(htmlContent, baseUrl);
+                String actualBaseUrl = getActualBaseUrlFromResponse(finalUrl);
+                List<String> iconUrls = parseHtmlForIcons(htmlContent, actualBaseUrl);
                 log.info("找到 {} 个候选图标链接", iconUrls.size());
                 
                 for (String iconUrl : iconUrls) {
@@ -475,34 +477,55 @@ public class FaviconExtractor {
     }
     
     /**
-     * 下载图标数据
+     * 获取HTML内容并返回实际的响应URL（类似Python中的实际解析URL逻辑）
      * 
-     * @param iconUrl 图标URL
-     * @return 图标数据字节数组，失败返回null
+     * @param url 目标URL
+     * @return HTML内容字符串，失败返回null
      */
-    private byte[] downloadIconData(String iconUrl) {
+    private String fetchHtmlContentWithUrl(String url) {
         try {
             Request request = new Request.Builder()
-                    .url(iconUrl)
+                    .url(url)
                     .addHeader("User-Agent", "Mozilla/5.0 (compatible; FaviconExtractor/1.0)")
                     .build();
             
             try (Response response = httpClient.newCall(request).execute()) {
                 if (response.isSuccessful() && response.body() != null) {
-                    String contentType = response.header("Content-Type", "");
-                    assert contentType != null;
-                    if (contentType.toLowerCase().contains("image") ||
-                        iconUrl.toLowerCase().endsWith(".svg") ||
-                        iconUrl.toLowerCase().endsWith(".ico")) {
-                        return response.body().bytes();
-                    }
+                    return response.body().string();
                 }
             }
         } catch (Exception e) {
-            log.debug("下载图标失败 {}: {}", iconUrl, e.getMessage());
+            log.warn("Failed to fetch HTML content from: {}", url, e);
         }
         return null;
     }
+    
+    /**
+     * 获取实际的基准URL从响应中（类似Python中的actual_base_url逻辑）
+     * 
+     * @param url 目标URL
+     * @return 实际的基准URL
+     */
+    private String getActualBaseUrlFromResponse(String url) {
+        try {
+            Request request = new Request.Builder()
+                    .url(url)
+                    .head()
+                    .build();
+            
+            try (Response response = httpClient.newCall(request).execute()) {
+                String actualUrl = response.request().url().toString();
+                URL parsedUrl = new URL(actualUrl);
+                return parsedUrl.getProtocol() + "://" + parsedUrl.getHost() + 
+                       (parsedUrl.getPort() != -1 ? ":" + parsedUrl.getPort() : "");
+            }
+        } catch (Exception e) {
+            log.warn("Failed to get actual base URL from: {}", url, e);
+            return url; // 失败时返回原URL
+        }
+    }
+    
+
     
     /**
      * 解析HTML获取各种图标链接（类似Python的parse_html_for_icons方法）
