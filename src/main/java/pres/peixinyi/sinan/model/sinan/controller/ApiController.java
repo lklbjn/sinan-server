@@ -1,29 +1,25 @@
 package pres.peixinyi.sinan.model.sinan.controller;
 
-import cn.dev33.satoken.stp.StpUtil;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import pres.peixinyi.sinan.common.Result;
 import pres.peixinyi.sinan.dto.request.AddBookmarkReq;
 import pres.peixinyi.sinan.dto.response.BookmarkResp;
 import pres.peixinyi.sinan.dto.response.BookmarkTreeResp;
+import pres.peixinyi.sinan.model.favicon.service.FaviconService;
+import pres.peixinyi.sinan.model.rbac.service.SnUserKeyService;
 import pres.peixinyi.sinan.model.sinan.entity.SnBookmark;
 import pres.peixinyi.sinan.model.sinan.entity.SnBookmarkAssTag;
 import pres.peixinyi.sinan.model.sinan.entity.SnSpace;
 import pres.peixinyi.sinan.model.sinan.entity.SnTag;
-import pres.peixinyi.sinan.model.sinan.service.SnBookmarkAssTagService;
-import pres.peixinyi.sinan.model.sinan.service.SnBookmarkService;
-import pres.peixinyi.sinan.model.sinan.service.SnSpaceService;
-import pres.peixinyi.sinan.model.sinan.service.SnTagService;
-import pres.peixinyi.sinan.model.rbac.service.SnUserKeyService;
-import pres.peixinyi.sinan.model.favicon.service.FaviconService;
+import pres.peixinyi.sinan.model.sinan.service.*;
 import pres.peixinyi.sinan.utils.PinyinUtils;
 
 import java.io.File;
@@ -41,6 +37,7 @@ import java.util.stream.Collectors;
  * @Date : 2025/8/22
  * @Version : 1.0.0
  */
+@Slf4j
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "*", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST})
@@ -63,6 +60,8 @@ public class ApiController {
 
     @Resource
     private FaviconService faviconService;
+    @Resource
+    private AsyncFaviconReloadService asyncFaviconReloadService;
 
     /**
      * 验证访问密钥并获取用户ID
@@ -340,7 +339,7 @@ public class ApiController {
      *
      * @param accessKey
      * @param search
-     * @return pres.peixinyi.sinan.common.Result<java.util.List<pres.peixinyi.sinan.dto.response.BookmarkResp>>
+     * @return pres.peixinyi.sinan.common.Result<java.util.List < pres.peixinyi.sinan.dto.response.BookmarkResp>>
      * @author peixinyi
      * @since 10:41 2025/8/27
      */
@@ -419,7 +418,7 @@ public class ApiController {
     /**
      * 获取最常使用的书签
      *
-     * @return pres.peixinyi.sinan.common.Result<java.util.List<pres.peixinyi.sinan.dto.response.BookmarkVO>>
+     * @return pres.peixinyi.sinan.common.Result<java.util.List < pres.peixinyi.sinan.dto.response.BookmarkVO>>
      * @author peixinyi
      * @since 20:45 2025/8/13
      */
@@ -516,6 +515,32 @@ public class ApiController {
     }
 
     /**
+     * 重新加载所有书签的图标
+     *
+     * @param accessKey
+     * @return org.springframework.http.ResponseEntity<java.lang.String>
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 13:11 2025/9/16
+     */
+    @GetMapping("/favicon/reload")
+    public ResponseEntity<String> reloadAllFavicon(@RequestHeader("X-Access-Key") String accessKey,
+                                                   @RequestParam boolean force) {
+        // 验证访问密钥
+        String userId = authenticateUser(accessKey);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            // 立即启动异步任务，不等待结果
+            asyncFaviconReloadService.reloadFaviconsAsync(userId, force);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
      * 根据文件扩展名确定Content-Type
      *
      * @param filename 文件名
@@ -547,7 +572,7 @@ public class ApiController {
     /**
      * 获取用户的所有空间
      *
-     * @param accessKey     访问密钥
+     * @param accessKey 访问密钥
      * @return 空间列表
      */
     @GetMapping("/spaces")

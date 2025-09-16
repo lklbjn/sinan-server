@@ -604,4 +604,8 @@ public class FaviconService {
             return false;
         }
     }
+
+    public String getIconUrl(String  url) {
+        return faviconExtractor.getIconUrl(url);
+    }
 }
