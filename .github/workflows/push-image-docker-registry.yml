@@ -13,7 +13,7 @@ jobs:
     environment: RUNTIME
     env:
       REGISTRY: docker.io
-      NAMESPACE: peixinyi
+      NAMESPACE: sparkly999
       IMAGE_NAME: sinan-server
       REGISTRY_USERNAME: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
