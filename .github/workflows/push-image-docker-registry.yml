@@ -5,8 +5,12 @@ on:
     branches:
       - main
       - develop
+    tags:
+      - '*'
   release:
     types: [published]
+  workflow_dispatch:
+  
 jobs:
   build:
     runs-on: ubuntu-latest
