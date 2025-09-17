@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -65,6 +66,9 @@ public class BookmarkController {
 
     @Value("${sinan.server.base-url}")
     private String baseUrl;
+
+    @Resource
+    private AsyncFaviconReloadService asyncFaviconReloadService;
 
     /**
      * 增加书签使用次数
@@ -787,6 +791,30 @@ public class BookmarkController {
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * 重新加载所有书签的图标
+     *
+     * @return org.springframework.http.ResponseEntity<java.lang.String>
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 13:11 2025/9/16
+     */
+    @PatchMapping("/favicon/reload")
+    public ResponseEntity<String> reloadAllFavicon(@RequestParam(value = "force", required = false, defaultValue = "false") boolean force) {
+        // 验证访问密钥
+        String userId = StpUtil.getLoginIdAsString();
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            // 立即启动异步任务，不等待结果
+            asyncFaviconReloadService.reloadFaviconsAsync(userId, force);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 

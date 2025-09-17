@@ -60,8 +60,6 @@ public class ApiController {
 
     @Resource
     private FaviconService faviconService;
-    @Resource
-    private AsyncFaviconReloadService asyncFaviconReloadService;
 
     /**
      * 验证访问密钥并获取用户ID
@@ -509,32 +507,6 @@ public class ApiController {
 
             return ResponseEntity.notFound().build();
 
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    /**
-     * 重新加载所有书签的图标
-     *
-     * @param accessKey
-     * @return org.springframework.http.ResponseEntity<java.lang.String>
-     * @author wangbinzhe
-     * @version 1.0.0.0
-     * @since 13:11 2025/9/16
-     */
-    @GetMapping("/favicon/reload")
-    public ResponseEntity<String> reloadAllFavicon(@RequestHeader("X-Access-Key") String accessKey,
-                                                   @RequestParam boolean force) {
-        // 验证访问密钥
-        String userId = authenticateUser(accessKey);
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        try {
-            // 立即启动异步任务，不等待结果
-            asyncFaviconReloadService.reloadFaviconsAsync(userId, force);
-            return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }

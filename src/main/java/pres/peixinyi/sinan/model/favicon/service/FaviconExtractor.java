@@ -23,7 +23,7 @@ import java.util.List;
  * Favicon提取器
  * 负责从网页HTML中提取各种类型的favicon信息
  * 支持7种类型：默认favicon.ico、icon标签、apple-touch-icon、twitter:image、mask-icon、theme-color、shortcut icon
- * 
+ *
  * @author Claude
  * @since 2.0
  */
@@ -32,7 +32,7 @@ import java.util.List;
 public class FaviconExtractor {
 
     private final OkHttpClient httpClient;
-    
+
     private static final String DEFAULT_FAVICON_PATH = "/favicon.ico";
     private static final int TIMEOUT_SECONDS = 10;
 
@@ -51,30 +51,30 @@ public class FaviconExtractor {
     /**
      * 从指定URL提取所有favicon信息
      * 包括从 HTML 中解析各种类型的图标链接，检查默认favicon.ico，选择最优图标
-     * 
+     *
      * @param url 目标网站URL
      * @return 包含所有找到的favicon信息和最优选择的提取结果
      */
     public FaviconExtractResult extractFavicons(String url) {
         long startTime = System.currentTimeMillis();
-        
+
         try {
             URL parsedUrl = new URL(url);
             String domain = parsedUrl.getHost();
-            String baseUrl = parsedUrl.getProtocol() + "://" + parsedUrl.getHost() + 
-                           (parsedUrl.getPort() != -1 ? ":" + parsedUrl.getPort() : "");
-            
+            String baseUrl = parsedUrl.getProtocol() + "://" + parsedUrl.getHost() +
+                    (parsedUrl.getPort() != -1 ? ":" + parsedUrl.getPort() : "");
+
             List<FaviconInfo> faviconList = new ArrayList<>();
-            
+
             String htmlContent = fetchHtmlContent(url);
             if (htmlContent != null) {
                 extractFromHtml(htmlContent, baseUrl, faviconList);
             }
-            
+
             checkDefaultFavicon(baseUrl, faviconList);
-            
+
             FaviconInfo bestFavicon = selectBestFavicon(faviconList);
-            
+
             return FaviconExtractResult.builder()
                     .domain(domain)
                     .url(url)
@@ -83,7 +83,7 @@ public class FaviconExtractor {
                     .success(true)
                     .extractTime(System.currentTimeMillis() - startTime)
                     .build();
-                    
+
         } catch (Exception e) {
             log.error("Failed to extract favicons from URL: {}", url, e);
             return FaviconExtractResult.builder()
@@ -94,10 +94,10 @@ public class FaviconExtractor {
                     .build();
         }
     }
-    
+
     /**
      * 获取指定URL的HTML内容
-     * 
+     *
      * @param url 目标URL
      * @return HTML内容字符串，失败返回null
      */
@@ -107,7 +107,7 @@ public class FaviconExtractor {
                     .url(url)
                     .addHeader("User-Agent", "Mozilla/5.0 (compatible; FaviconExtractor/1.0)")
                     .build();
-            
+
             try (Response response = httpClient.newCall(request).execute()) {
                 if (response.isSuccessful() && response.body() != null) {
                     return response.body().string();
@@ -118,52 +118,52 @@ public class FaviconExtractor {
         }
         return null;
     }
-    
+
     /**
      * 从HTML内容中提取favicon信息
-     * 
+     *
      * @param htmlContent HTML内容
-     * @param baseUrl 基本URL，用于解析相对路径
+     * @param baseUrl     基本URL，用于解析相对路径
      * @param faviconList 用于存储提取结果的列表
      */
     private void extractFromHtml(String htmlContent, String baseUrl, List<FaviconInfo> faviconList) {
         try {
             Document doc = Jsoup.parse(htmlContent);
-            
+
             extractIconLinks(doc, baseUrl, faviconList);
             extractMetaTags(doc, baseUrl, faviconList);
-            
+
         } catch (Exception e) {
             log.warn("Failed to parse HTML content", e);
         }
     }
-    
+
     /**
      * 提取HTML中link标签的图标信息
      * 支持icon、shortcut icon、apple-touch-icon、mask-icon类型
-     * 
-     * @param doc JSoup解析的HTML文档
-     * @param baseUrl 基本URL
+     *
+     * @param doc         JSoup解析的HTML文档
+     * @param baseUrl     基本URL
      * @param faviconList 结果存储列表
      */
     private void extractIconLinks(Document doc, String baseUrl, List<FaviconInfo> faviconList) {
         Elements iconLinks = doc.select("link[rel~=(?i)(icon|shortcut\\s+icon|apple-touch-icon|mask-icon)]");
-        
+
         for (Element link : iconLinks) {
             String rel = link.attr("rel").toLowerCase().trim();
             String href = link.attr("href");
-            
+
             if (href == null || href.trim().isEmpty()) {
                 continue;
             }
-            
+
             String absoluteHref = resolveUrl(baseUrl, href.trim());
             String type = link.attr("type");
             String sizes = link.attr("sizes");
             String color = link.attr("color");
-            
+
             FaviconInfo.FaviconType faviconType = determineFaviconType(rel);
-            
+
             FaviconInfo faviconInfo = FaviconInfo.builder()
                     .url(absoluteHref)
                     .href(href.trim())
@@ -174,17 +174,17 @@ public class FaviconExtractor {
                     .priority(faviconType.getDefaultPriority())
                     .cached(false)
                     .build();
-            
+
             faviconList.add(faviconInfo);
         }
     }
-    
+
     /**
      * 提取HTML中meta标签的图标信息
      * 支持twitter:image和theme-color类型
-     * 
-     * @param doc JSoup解析的HTML文档
-     * @param baseUrl 基本URL
+     *
+     * @param doc         JSoup解析的HTML文档
+     * @param baseUrl     基本URL
      * @param faviconList 结果存储列表
      */
     private void extractMetaTags(Document doc, String baseUrl, List<FaviconInfo> faviconList) {
@@ -193,7 +193,7 @@ public class FaviconExtractor {
             String content = meta.attr("content");
             if (!content.isEmpty()) {
                 String absoluteUrl = resolveUrl(baseUrl, content);
-                
+
                 FaviconInfo faviconInfo = FaviconInfo.builder()
                         .url(absoluteUrl)
                         .href(content)
@@ -202,11 +202,11 @@ public class FaviconExtractor {
                         .priority(FaviconInfo.FaviconType.TWITTER_IMAGE.getDefaultPriority())
                         .cached(false)
                         .build();
-                
+
                 faviconList.add(faviconInfo);
             }
         }
-        
+
         Elements themeColorMeta = doc.select("meta[name=theme-color]");
         for (Element meta : themeColorMeta) {
             String content = meta.attr("content");
@@ -217,23 +217,23 @@ public class FaviconExtractor {
                         .priority(FaviconInfo.FaviconType.THEME_COLOR.getDefaultPriority())
                         .cached(false)
                         .build();
-                
+
                 faviconList.add(faviconInfo);
             }
         }
     }
-    
+
     /**
      * 检查默认favicon.ico文件是否存在
      * 如果列表中没有默认favicon且根目录下的favicon.ico可访问，则添加到列表
-     * 
-     * @param baseUrl 网站基本URL
+     *
+     * @param baseUrl     网站基本URL
      * @param faviconList favicon列表
      */
     private void checkDefaultFavicon(String baseUrl, List<FaviconInfo> faviconList) {
         boolean hasDefaultFavicon = faviconList.stream()
                 .anyMatch(f -> f.getFaviconType() == FaviconInfo.FaviconType.DEFAULT_FAVICON);
-        
+
         if (!hasDefaultFavicon) {
             String defaultFaviconUrl = baseUrl + DEFAULT_FAVICON_PATH;
             if (isUrlAccessible(defaultFaviconUrl)) {
@@ -245,16 +245,16 @@ public class FaviconExtractor {
                         .priority(FaviconInfo.FaviconType.DEFAULT_FAVICON.getDefaultPriority())
                         .cached(false)
                         .build();
-                
+
                 faviconList.add(faviconInfo);
             }
         }
     }
-    
+
     /**
      * 从所有favicon中选择最优的一个
      * 按优先级排序，相同优先级下选择尺寸更大的
-     * 
+     *
      * @param faviconList 所有找到的favicon列表
      * @return 最优favicon，无可用图标返回null
      */
@@ -262,7 +262,7 @@ public class FaviconExtractor {
         if (faviconList.isEmpty()) {
             return null;
         }
-        
+
         // 首先查找SVG格式的图标
         FaviconInfo svgIcon = faviconList.stream()
                 .filter(f -> f.getUrl() != null && !f.getUrl().trim().isEmpty())
@@ -270,18 +270,18 @@ public class FaviconExtractor {
                 .filter(this::isSvgIcon)
                 .min(Comparator.comparingInt(FaviconInfo::getPriority))
                 .orElse(null);
-                
+
         // 如果找到SVG图标，优先返回
         if (svgIcon != null) {
             return svgIcon;
         }
-        
+
         // 否则按原有逻辑选择
         return faviconList.stream()
                 .filter(f -> f.getUrl() != null && !f.getUrl().trim().isEmpty())
                 .filter(f -> f.getFaviconType() != FaviconInfo.FaviconType.THEME_COLOR)
                 .min(Comparator.comparingInt(FaviconInfo::getPriority)
-                     .thenComparing(f -> parseSizeValue(f.getSizes()), Comparator.reverseOrder()))
+                        .thenComparing(f -> parseSizeValue(f.getSizes()), Comparator.reverseOrder()))
                 .orElse(faviconList.stream()
                         .filter(f -> f.getUrl() != null && !f.getUrl().trim().isEmpty())
                         .findFirst()
@@ -303,7 +303,7 @@ public class FaviconExtractor {
         }
         return favicon.getFaviconType() == FaviconInfo.FaviconType.MASK_ICON;
     }
-    
+
     private FaviconInfo.FaviconType determineFaviconType(String rel) {
         if (rel.contains("apple-touch-icon")) {
             return FaviconInfo.FaviconType.APPLE_TOUCH_ICON;
@@ -315,12 +315,12 @@ public class FaviconExtractor {
             return FaviconInfo.FaviconType.ICON;
         }
     }
-    
+
     private String resolveUrl(String baseUrl, String href) {
         if (href.startsWith("http://") || href.startsWith("https://")) {
             return href;
         }
-        
+
         if (href.startsWith("//")) {
             try {
                 URL base = new URL(baseUrl);
@@ -329,21 +329,21 @@ public class FaviconExtractor {
                 return "https:" + href;
             }
         }
-        
+
         if (href.startsWith("/")) {
             return baseUrl + href;
         }
-        
+
         return baseUrl + "/" + href;
     }
-    
+
     private boolean isUrlAccessible(String url) {
         try {
             Request request = new Request.Builder()
                     .url(url)
                     .head()
                     .build();
-            
+
             try (Response response = httpClient.newCall(request).execute()) {
                 return response.isSuccessful();
             }
@@ -351,12 +351,12 @@ public class FaviconExtractor {
             return false;
         }
     }
-    
+
     private int parseSizeValue(String sizes) {
         if (sizes == null || sizes.trim().isEmpty()) {
             return 0;
         }
-        
+
         String[] parts = sizes.split("x");
         if (parts.length >= 2) {
             try {
@@ -372,7 +372,7 @@ public class FaviconExtractor {
      * 从指定URL获取图标直接地址（完全遵循Python getIcon.py的逻辑）
      * 支持多种图标获取方式：根目录favicon.ico、HTML中的各种图标链接
      * 包含重定向跟踪和完整的图像验证
-     * 
+     *
      * @param url 目标网站URL
      * @return 图标直接URL地址，失败返回null
      */
@@ -381,11 +381,11 @@ public class FaviconExtractor {
             // 先跟踪重定向获取最终URL
             String finalUrl = getFinalUrlAfterRedirects(url);
             URL parsedUrl = new URL(finalUrl);
-            String baseUrl = parsedUrl.getProtocol() + "://" + parsedUrl.getHost() + 
-                           (parsedUrl.getPort() != -1 ? ":" + parsedUrl.getPort() : "");
-            
+            String baseUrl = parsedUrl.getProtocol() + "://" + parsedUrl.getHost() +
+                    (parsedUrl.getPort() != -1 ? ":" + parsedUrl.getPort() : "");
+
             log.info("实际解析的URL: {}", baseUrl);
-            
+
             // 方法1: 尝试从根目录获取favicon.ico（类似Python的get_favicon_from_root）
             String faviconUrl = baseUrl + "/favicon.ico";
             byte[] iconData = downloadImage(faviconUrl);
@@ -393,7 +393,7 @@ public class FaviconExtractor {
                 log.info("从根目录获取到图标: {}", faviconUrl);
                 return faviconUrl;
             }
-            
+
             // 方法2: 解析HTML获取各种图标（类似Python的parse_html_for_icons）
             // 使用实际的HTML响应URL作为baseUrl，而不是重定向后的URL
             String htmlContent = fetchHtmlContentWithUrl(finalUrl);
@@ -401,8 +401,14 @@ public class FaviconExtractor {
                 String actualBaseUrl = getActualBaseUrlFromResponse(finalUrl);
                 List<String> iconUrls = parseHtmlForIcons(htmlContent, actualBaseUrl);
                 log.info("找到 {} 个候选图标链接", iconUrls.size());
-                
+
                 for (String iconUrl : iconUrls) {
+                    // 检查是否为data URI (base64)，如果是则直接返回
+                    if (iconUrl.toLowerCase().startsWith("data:")) {
+                        log.info("找到data URI图标: {}", iconUrl);
+                        return iconUrl;
+                    }
+
                     iconData = downloadImage(iconUrl);
                     if (iconData != null) {
                         log.info("成功获取图标: {}", iconUrl);
@@ -410,20 +416,20 @@ public class FaviconExtractor {
                     }
                 }
             }
-            
+
             log.warn("无法获取图标: {}", url);
             return null;
-            
+
         } catch (Exception e) {
             log.error("获取图标失败: {}", url, e);
             return null;
         }
     }
-    
+
     /**
      * 下载图像并验证是否为有效图像（类似Python的download_image方法）
      * 不仅检查HTTP状态码，还验证内容类型是否为图像或SVG
-     * 
+     *
      * @param url 图像URL
      * @return 图像数据字节数组，如果不是有效图像则返回null
      */
@@ -433,13 +439,13 @@ public class FaviconExtractor {
                     .url(url)
                     .addHeader("User-Agent", "Mozilla/5.0 (compatible; FaviconExtractor/1.0)")
                     .build();
-            
+
             try (Response response = httpClient.newCall(request).execute()) {
                 if (response.isSuccessful() && response.body() != null) {
                     String contentType = response.header("Content-Type", "");
-                    if (contentType != null && 
-                        (contentType.toLowerCase().contains("image") || 
-                         isSvgFormat(url, contentType))) {
+                    if (contentType != null &&
+                            (contentType.toLowerCase().contains("image") ||
+                                    isSvgFormat(url, contentType))) {
                         // 确认是有效图像，返回数据
                         return response.body().bytes();
                     }
@@ -450,11 +456,11 @@ public class FaviconExtractor {
         }
         return null;
     }
-    
+
     /**
      * 获取重定向后的最终URL（类似Python的get_final_url_after_redirects方法）
      * 使用HEAD请求跟踪重定向，更高效
-     * 
+     *
      * @param url 原始URL
      * @return 重定向后的最终URL，失败返回原URL
      */
@@ -464,7 +470,7 @@ public class FaviconExtractor {
                     .url(url)
                     .head()
                     .build();
-            
+
             try (Response response = httpClient.newCall(request).execute()) {
                 String finalUrl = response.request().url().toString();
                 log.info("重定向跟踪: {} -> {}", url, finalUrl);
@@ -475,10 +481,10 @@ public class FaviconExtractor {
             return url; // 如果失败，返回原URL
         }
     }
-    
+
     /**
      * 获取HTML内容并返回实际的响应URL（类似Python中的实际解析URL逻辑）
-     * 
+     *
      * @param url 目标URL
      * @return HTML内容字符串，失败返回null
      */
@@ -488,7 +494,7 @@ public class FaviconExtractor {
                     .url(url)
                     .addHeader("User-Agent", "Mozilla/5.0 (compatible; FaviconExtractor/1.0)")
                     .build();
-            
+
             try (Response response = httpClient.newCall(request).execute()) {
                 if (response.isSuccessful() && response.body() != null) {
                     return response.body().string();
@@ -499,10 +505,10 @@ public class FaviconExtractor {
         }
         return null;
     }
-    
+
     /**
      * 获取实际的基准URL从响应中（类似Python中的actual_base_url逻辑）
-     * 
+     *
      * @param url 目标URL
      * @return 实际的基准URL
      */
@@ -512,132 +518,159 @@ public class FaviconExtractor {
                     .url(url)
                     .head()
                     .build();
-            
+
             try (Response response = httpClient.newCall(request).execute()) {
                 String actualUrl = response.request().url().toString();
                 URL parsedUrl = new URL(actualUrl);
-                return parsedUrl.getProtocol() + "://" + parsedUrl.getHost() + 
-                       (parsedUrl.getPort() != -1 ? ":" + parsedUrl.getPort() : "");
+                return parsedUrl.getProtocol() + "://" + parsedUrl.getHost() +
+                        (parsedUrl.getPort() != -1 ? ":" + parsedUrl.getPort() : "");
             }
         } catch (Exception e) {
             log.warn("Failed to get actual base URL from: {}", url, e);
             return url; // 失败时返回原URL
         }
     }
-    
 
-    
+
     /**
      * 解析HTML获取各种图标链接（类似Python的parse_html_for_icons方法）
      * 包含完整的优先级计算和排序
-     * 
+     *
      * @param htmlContent HTML内容
-     * @param baseUrl 基本URL
+     * @param baseUrl     基本URL
      * @return 图标URL列表（按优先级排序）
      */
     private List<String> parseHtmlForIcons(String htmlContent, String baseUrl) {
         List<IconUrlWithPriority> iconList = new ArrayList<>();
         List<String> iconUrls = new ArrayList<>();
-        
+
         try {
             Document doc = Jsoup.parse(htmlContent);
-            
+
             // 标准的icon链接
             Elements iconLinks = doc.select("link[rel~=(?i)(icon|shortcut\\s+icon)]");
             for (Element link : iconLinks) {
                 String href = link.attr("href");
                 if (href != null && !href.trim().isEmpty()) {
-                    String absoluteUrl = resolveUrl(baseUrl, href.trim());
                     String rel = link.attr("rel").toLowerCase();
                     String sizes = link.attr("sizes");
                     String type = link.attr("type");
-                    
-                    int priority = getIconPriority(rel, sizes, absoluteUrl, type);
-                    iconList.add(new IconUrlWithPriority(absoluteUrl, priority));
-                    log.debug("找到icon链接: {} -> {} (优先级: {})", href, absoluteUrl, priority);
+
+                    // 检查是否为data URI (base64)
+                    if (href.trim().toLowerCase().startsWith("data:")) {
+                        // data URI优先级最低
+                        iconList.add(new IconUrlWithPriority(href.trim(), -1000));
+                        log.debug("找到data URI图标: {} (优先级: -1000)", href);
+                    } else {
+                        String absoluteUrl = resolveUrl(baseUrl, href.trim());
+                        int priority = getIconPriority(rel, sizes, absoluteUrl, type);
+                        iconList.add(new IconUrlWithPriority(absoluteUrl, priority));
+                        log.debug("找到icon链接: {} -> {} (优先级: {})", href, absoluteUrl, priority);
+                    }
                 }
             }
-            
+
             // Apple touch icon
             Elements appleTouchIcons = doc.select("link[rel~=(?i)apple-touch-icon]");
             for (Element link : appleTouchIcons) {
                 String href = link.attr("href");
                 if (href != null && !href.trim().isEmpty()) {
-                    String absoluteUrl = resolveUrl(baseUrl, href.trim());
                     String sizes = link.attr("sizes");
                     String type = link.attr("type");
-                    
-                    int priority = getIconPriority("apple-touch-icon", sizes, absoluteUrl, type);
-                    iconList.add(new IconUrlWithPriority(absoluteUrl, priority));
-                    log.debug("找到apple-touch-icon: {} -> {} (优先级: {})", href, absoluteUrl, priority);
+
+                    // 检查是否为data URI (base64)
+                    if (href.trim().toLowerCase().startsWith("data:")) {
+                        // data URI优先级最低
+                        iconList.add(new IconUrlWithPriority(href.trim(), -1000));
+                        log.debug("找到data URI apple-touch-icon: {} (优先级: -1000)", href);
+                    } else {
+                        String absoluteUrl = resolveUrl(baseUrl, href.trim());
+                        int priority = getIconPriority("apple-touch-icon", sizes, absoluteUrl, type);
+                        iconList.add(new IconUrlWithPriority(absoluteUrl, priority));
+                        log.debug("找到apple-touch-icon: {} -> {} (优先级: {})", href, absoluteUrl, priority);
+                    }
                 }
             }
-            
+
             // Twitter卡片图标
             Elements twitterImages = doc.select("meta[name=twitter:image]");
             for (Element meta : twitterImages) {
                 String content = meta.attr("content");
                 if (content != null && !content.trim().isEmpty()) {
-                    String absoluteUrl = resolveUrl(baseUrl, content.trim());
-                    int priority = getIconPriority("twitter:image", "", absoluteUrl, "");
-                    iconList.add(new IconUrlWithPriority(absoluteUrl, priority));
-                    log.debug("找到twitter:image: {} -> {} (优先级: {})", content, absoluteUrl, priority);
+                    // 检查是否为data URI (base64)
+                    if (content.trim().toLowerCase().startsWith("data:")) {
+                        // data URI优先级最低
+                        iconList.add(new IconUrlWithPriority(content.trim(), -1000));
+                        log.debug("找到data URI twitter:image: {} (优先级: -1000)", content);
+                    } else {
+                        String absoluteUrl = resolveUrl(baseUrl, content.trim());
+                        int priority = getIconPriority("twitter:image", "", absoluteUrl, "");
+                        iconList.add(new IconUrlWithPriority(absoluteUrl, priority));
+                        log.debug("找到twitter:image: {} -> {} (优先级: {})", content, absoluteUrl, priority);
+                    }
                 }
             }
-            
+
             // Safari mask icon
             Elements maskIcons = doc.select("link[rel~=(?i)mask-icon]");
             for (Element link : maskIcons) {
                 String href = link.attr("href");
                 if (href != null && !href.trim().isEmpty()) {
-                    String absoluteUrl = resolveUrl(baseUrl, href.trim());
                     String type = link.attr("type");
-                    
-                    int priority = getIconPriority("mask-icon", "", absoluteUrl, type);
-                    iconList.add(new IconUrlWithPriority(absoluteUrl, priority));
-                    log.debug("找到mask-icon: {} -> {} (优先级: {})", href, absoluteUrl, priority);
+
+                    // 检查是否为data URI (base64)
+                    if (href.trim().toLowerCase().startsWith("data:")) {
+                        // data URI优先级最低
+                        iconList.add(new IconUrlWithPriority(href.trim(), -1000));
+                        log.debug("找到data URI mask-icon: {} (优先级: -1000)", href);
+                    } else {
+                        String absoluteUrl = resolveUrl(baseUrl, href.trim());
+                        int priority = getIconPriority("mask-icon", "", absoluteUrl, type);
+                        iconList.add(new IconUrlWithPriority(absoluteUrl, priority));
+                        log.debug("找到mask-icon: {} -> {} (优先级: {})", href, absoluteUrl, priority);
+                    }
                 }
             }
-            
+
             // 按优先级排序（优先级高的在前面）
             iconList.sort((a, b) -> Integer.compare(b.priority, a.priority));
-            
+
             // 提取排序后的URL列表
             for (IconUrlWithPriority item : iconList) {
                 iconUrls.add(item.url);
             }
-            
+
         } catch (Exception e) {
             log.warn("解析HTML获取图标链接失败", e);
         }
-        
+
         return iconUrls;
     }
-    
+
     /**
      * 根据rel属性、sizes、URL和type确定优先级（类似Python的get_icon_priority方法）
-     * 
-     * @param rel rel属性
+     *
+     * @param rel   rel属性
      * @param sizes sizes属性
-     * @param url 图标URL
-     * @param type type属性
+     * @param url   图标URL
+     * @param type  type属性
      * @return 优先级数值
      */
     private int getIconPriority(String rel, String sizes, String url, String type) {
         int priority = 5; // 基础优先级
-        
+
         // SVG格式获得最高优先级加成
         if (isSvgFormat(url, type)) {
             priority += 10;
             log.debug("SVG格式，优先级+10: {}", url);
         }
-        
+
         // PNG/JPG格式优先级加成
         if (isPngOrJpgFormat(url, type)) {
             priority += 5;
             log.debug("PNG或者JPG格式，优先级+5: {}", url);
         }
-        
+
         // 根据rel类型调整优先级
         if (rel.contains("apple-touch-icon")) {
             priority += 3;
@@ -646,7 +679,7 @@ public class FaviconExtractor {
         } else if (rel.contains("mask-icon")) {
             priority += 1;
         }
-        
+
         // 根据尺寸调整优先级
         if (sizes != null && !sizes.trim().isEmpty()) {
             java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(\\d+)x(\\d+)");
@@ -667,7 +700,7 @@ public class FaviconExtractor {
                 }
             }
         }
-        
+
         // 根据文件扩展名调整优先级
         if (url != null) {
             String urlLower = url.toLowerCase();
@@ -681,10 +714,10 @@ public class FaviconExtractor {
                 priority += 1;
             }
         }
-        
+
         return priority;
     }
-    
+
     /**
      * 判断是否为SVG格式（类似Python的is_svg_format方法）
      */
@@ -697,7 +730,7 @@ public class FaviconExtractor {
         }
         return false;
     }
-    
+
     /**
      * 判断是否为PNG或JPG格式（类似Python的is_png_or_jpg_format方法）
      */
@@ -716,23 +749,23 @@ public class FaviconExtractor {
         }
         return false;
     }
-    
+
     /**
      * 内部类用于存储URL和优先级
      */
     private static class IconUrlWithPriority {
         String url;
         int priority;
-        
+
         IconUrlWithPriority(String url, int priority) {
             this.url = url;
             this.priority = priority;
         }
     }
-    
+
     /**
      * 根据URL确定优先级（SVG最高，PNG/JPG次之，ICO最低）
-     * 
+     *
      * @param url 图标URL
      * @return 优先级数值
      */
@@ -740,7 +773,7 @@ public class FaviconExtractor {
         if (url == null) {
             return 0;
         }
-        
+
         String lowerUrl = url.toLowerCase();
         if (lowerUrl.endsWith(".svg")) {
             return 10;
