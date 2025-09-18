@@ -1,32 +1,30 @@
 package pres.peixinyi.sinan.model.sinan.service;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
+import org.springframework.web.multipart.MultipartFile;
+import pres.peixinyi.sinan.dto.response.BookmarkResp;
+import pres.peixinyi.sinan.dto.response.ImportBookmarkResp;
+import pres.peixinyi.sinan.model.sinan.entity.SnBookmark;
+import pres.peixinyi.sinan.model.sinan.entity.SnBookmarkAssTag;
+import pres.peixinyi.sinan.model.sinan.entity.SnTag;
+import pres.peixinyi.sinan.model.sinan.mapper.SnBookmarkMapper;
+import pres.peixinyi.sinan.utils.PinyinUtils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.springframework.util.ObjectUtils;
-import pres.peixinyi.sinan.model.sinan.entity.SnBookmarkAssTag;
-import pres.peixinyi.sinan.model.sinan.mapper.SnBookmarkMapper;
-import pres.peixinyi.sinan.model.sinan.entity.SnBookmark;
-import pres.peixinyi.sinan.model.sinan.entity.SnTag;
-import pres.peixinyi.sinan.dto.response.ImportBookmarkResp;
-import jakarta.annotation.Resource;
-import pres.peixinyi.sinan.utils.PinyinUtils;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -573,7 +571,7 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
             Integer totalCount = bookmarks.size();
             Integer skipCount = 0;
 
-            //过滤已经存在的书签
+            // 过滤已经存在的书签
             bookmarks = bookmarks.stream().filter(bookmark -> !existBookmarks.contains(bookmark)).toList();
             skipCount = totalCount - bookmarks.size();
 
@@ -766,4 +764,220 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
                 .list();
     }
 
+    public Map<String, List<BookmarkResp>> duplicateCheck(String userId, Integer level,
+                                                          Boolean ignoreDuplicate, Boolean stronglyCorrelated) {
+        // 获取用户书签列表
+        List<SnBookmark> bookmarks = lambdaQuery()
+                .eq(SnBookmark::getUserId, userId)
+                .eq(ignoreDuplicate, SnBookmark::getIgnoreDuplicate, !ignoreDuplicate)
+                .eq(SnBookmark::getDeleted, 0)
+                .list();
+
+        // 根据 stronglyCorrelated 参数决定分组方式
+        Map<String, List<SnBookmark>> allGrouped;
+        if (Boolean.TRUE.equals(stronglyCorrelated)) {
+            // 当 stronglyCorrelated 为 true 时，按完整 URL 分组
+            allGrouped = bookmarks.stream()
+                    .collect(Collectors.groupingBy(SnBookmark::getUrl));
+        } else {
+            // 否则按域名分组
+            allGrouped = bookmarks.stream()
+                    .collect(Collectors.groupingBy(item -> extractDomain(item.getUrl(), level)));
+        }
+
+        // 批量获取书签的标签信息
+        List<String> bookmarkIds = bookmarks.stream()
+                .map(SnBookmark::getId)
+                .toList();
+
+        Map<String, List<SnTag>> bookmarkTagsMap = getBatchBookmarkTags(bookmarkIds);
+
+        // 过滤出值列表大小大于等于2的键值对
+        return allGrouped.entrySet().stream()
+                .filter(entry -> entry.getValue().size() >= 2)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().stream()
+                                .map(bookmark -> {
+                                    List<SnTag> tags = bookmarkTagsMap.getOrDefault(bookmark.getId(), Collections.emptyList());
+                                    return BookmarkResp.from(bookmark, tags);
+                                })
+                                .toList()
+                ));
+    }
+
+
+    /**
+     * 从URL中提取指定级别的域名，如果是IP地址则直接返回IP
+     *
+     * @param url   完整的URL地址
+     * @param level 需要提取的域名级别（如2表示二级域名）
+     * @return 提取的域名或IP地址
+     */
+    public static String extractDomain(String url, Integer level) {
+        if (url == null || url.isEmpty() || level == null || level <= 0) {
+            return "";
+        }
+
+        // 移除协议部分 (http://, https://, ftp:// 等)
+        String domain = url;
+        if (domain.contains("://")) {
+            domain = domain.split("://")[1];
+        }
+
+        // 处理IPv6地址的特殊情况（方括号包围）
+        if (domain.startsWith("[")) {
+            int closeBracketIndex = domain.indexOf("]");
+            if (closeBracketIndex > 0) {
+                // 提取IPv6地址（不包括方括号）
+                String ipv6 = domain.substring(1, closeBracketIndex);
+                if (isIPv6Address(ipv6)) {
+                    return ipv6;
+                }
+            }
+        }
+
+        // 移除路径部分和查询参数
+        if (domain.contains("/")) {
+            domain = domain.split("/")[0];
+        }
+
+        // 移除端口号
+        if (domain.contains(":")) {
+            // 检查是否为IPv6地址（可能包含多个冒号）
+            if (domain.contains("[") && domain.contains("]")) {
+                // IPv6地址的端口号在方括号后面
+                int closeBracketIndex = domain.indexOf("]");
+                if (closeBracketIndex < domain.length() - 1 && domain.charAt(closeBracketIndex + 1) == ':') {
+                    // 提取IPv6地址（不包括方括号）
+                    String ipv6 = domain.substring(1, closeBracketIndex);
+                    if (isIPv6Address(ipv6)) {
+                        return ipv6;
+                    }
+                }
+            } else {
+                // 处理IPv4地址或域名的端口号
+                domain = domain.split(":")[0];
+            }
+        }
+
+        // 检查是否为IPv4地址
+        if (isIPv4Address(domain)) {
+            return domain;
+        }
+
+        // 按点分割域名部分
+        String[] parts = domain.split("\\.");
+
+        // 如果请求的级别大于实际域名级别，返回完整域名
+        if (level >= parts.length) {
+            return domain;
+        }
+
+        // 构建指定级别的域名
+        StringBuilder result = new StringBuilder();
+        // 从后向前取level个部分
+        for (int i = parts.length - level; i < parts.length; i++) {
+            if (i > parts.length - level) {
+                result.append(".");
+            }
+            result.append(parts[i]);
+        }
+
+        return result.toString();
+    }
+
+    /**
+     * 判断一个字符串是否为IP地址（IPv4或IPv6）
+     *
+     * @param str 要检查的字符串
+     * @return 如果是IP地址则返回true，否则返回false
+     */
+    public static boolean isIpAddress(String str) {
+        // 检查IPv4地址
+        if (isIPv4Address(str)) {
+            return true;
+        }
+
+        // 检查IPv6地址
+        return isIPv6Address(str);
+    }
+
+    /**
+     * 判断一个字符串是否为IPv4地址
+     *
+     * @param str 要检查的字符串
+     * @return 如果是IPv4地址则返回true，否则返回false
+     */
+    public static boolean isIPv4Address(String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+
+        String[] parts = str.split("\\.");
+        if (parts.length != 4) {
+            return false;
+        }
+
+        for (String part : parts) {
+            try {
+                int num = Integer.parseInt(part);
+                if (num < 0 || num > 255) {
+                    return false;
+                }
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 判断一个字符串是否为IPv6地址
+     *
+     * @param str 要检查的字符串
+     * @return 如果是IPv6地址则返回true，否则返回false
+     */
+    public static boolean isIPv6Address(String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+
+        // 简单的IPv6检查，更复杂的实现可能需要正则表达式
+        String[] parts = str.split(":");
+        if (parts.length < 2 || parts.length > 8) {
+            return false;
+        }
+
+        for (String part : parts) {
+            // 空部分是合法的（表示连续的0）
+            if (part.isEmpty()) {
+                continue;
+            }
+
+            // 每个部分应该是1-4位的十六进制数
+            if (part.length() > 4) {
+                return false;
+            }
+
+            try {
+                // 尝试将部分解析为十六进制数
+                Integer.parseInt(part, 16);
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public void duplicateCheckMarkIgnore(String id) {
+        // 当前登录用户id
+        String userId = StpUtil.getLoginIdAsString();
+        lambdaUpdate().eq(SnBookmark::getUserId, userId)
+                .eq(SnBookmark::getId, id)
+                .set(SnBookmark::getIgnoreDuplicate, true)
+                .update();
+    }
 }

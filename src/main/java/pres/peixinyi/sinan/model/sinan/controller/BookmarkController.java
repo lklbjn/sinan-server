@@ -125,7 +125,7 @@ public class BookmarkController {
     /**
      * 获取最常使用的书签
      *
-     * @return pres.peixinyi.sinan.common.Result<java.util.List<pres.peixinyi.sinan.dto.response.BookmarkVO>>
+     * @return pres.peixinyi.sinan.common.Result<java.util.List < pres.peixinyi.sinan.dto.response.BookmarkVO>>
      * @author peixinyi
      * @since 20:45 2025/8/13
      */
@@ -162,7 +162,7 @@ public class BookmarkController {
     /**
      * 获取没有NameSpace的书签
      *
-     * @return pres.peixinyi.sinan.common.Result<java.util.List<pres.peixinyi.sinan.dto.response.BookmarkResp>>
+     * @return pres.peixinyi.sinan.common.Result<java.util.List < pres.peixinyi.sinan.dto.response.BookmarkResp>>
      * @author peixinyi
      * @since 21:03 2025/8/17
      */
@@ -199,7 +199,7 @@ public class BookmarkController {
     /**
      * 获取没有NameSpace的书签分页
      *
-     * @return pres.peixinyi.sinan.common.Result<Page<BookmarkResp>>
+     * @return pres.peixinyi.sinan.common.Result<Page < BookmarkResp>>
      * @author peixinyi
      * @since 16:26 2025/8/18
      */
@@ -246,14 +246,14 @@ public class BookmarkController {
     public Result<SnBookmark> addBookmark(@RequestBody AddBookmarkReq req) {
         String currentUserId = StpUtil.getLoginIdAsString();
 
-        //检查namespace是否存在和属于当前用户
+        // 检查namespace是否存在和属于当前用户
         if (req.getNamespaceId() != null) {
             if (!spaceService.isNamespaceBelongsToUser(req.getNamespaceId(), currentUserId)) {
                 return Result.fail("命名空间不存在或无权限访问");
             }
         }
 
-        //检查Tags是否存在和属于当前用户
+        // 检查Tags是否存在和属于当前用户
         if (!req.getNamespaceId().isEmpty()) {
             if (!tagService.areAllTagsBelongToUser(req.getTagsIds(), currentUserId)) {
                 return Result.fail("部分标签不存在或无权限访问");
@@ -261,7 +261,7 @@ public class BookmarkController {
         }
 
 
-        //初始化参数
+        // 初始化参数
         SnBookmark bookmark = new SnBookmark();
         bookmark.setUserId(currentUserId);
         bookmark.setSpaceId(req.getNamespaceId());
@@ -272,7 +272,7 @@ public class BookmarkController {
 
         SnBookmark savedBookmark = bookmarkService.addBookmark(bookmark);
 
-        //处理标签关联
+        // 处理标签关联
         if (req.getTagsIds() != null && !req.getTagsIds().isEmpty()) {
             for (String tagId : req.getTagsIds()) {
                 SnBookmarkAssTag assTag = new SnBookmarkAssTag();
@@ -488,7 +488,7 @@ public class BookmarkController {
      * 获取星标书签
      *
      * @param limit 限制数量，默认10
-     * @return pres.peixinyi.sinan.common.Result<java.util.List<pres.peixinyi.sinan.dto.response.BookmarkResp>>
+     * @return pres.peixinyi.sinan.common.Result<java.util.List < pres.peixinyi.sinan.dto.response.BookmarkResp>>
      * @author peixinyi
      * @since 2025/8/13
      */
@@ -806,9 +806,6 @@ public class BookmarkController {
     public ResponseEntity<String> reloadAllFavicon(@RequestParam(value = "force", required = false, defaultValue = "false") boolean force) {
         // 验证访问密钥
         String userId = StpUtil.getLoginIdAsString();
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         try {
             // 立即启动异步任务，不等待结果
             asyncFaviconReloadService.reloadFaviconsAsync(userId, force);
@@ -816,6 +813,43 @@ public class BookmarkController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    /**
+     * 检查书签的重复性
+     *
+     * @param level              域名级别
+     * @param ignoreDuplicate    是否忽略重复
+     * @param stronglyCorrelated 是否强关联
+     * @return 重复的书签列表
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 11:19 2025/9/17
+     */
+    @GetMapping("/duplicate/check")
+    public Result<Map<String, List<BookmarkResp>>> duplicateCheck(@RequestParam(value = "level", required = false, defaultValue = "3") Integer level,
+                                                                  @RequestParam(value = "ignoreDuplicate", required = false, defaultValue = "false") Boolean ignoreDuplicate,
+                                                                  @RequestParam(value = "stronglyCorrelated", required = false, defaultValue = "true") Boolean stronglyCorrelated) {
+        // 当前登录用户id
+        String userId = StpUtil.getLoginIdAsString();
+        // 立即启动异步任务，不等待结果
+        return Result.ok(bookmarkService.duplicateCheck(userId, level, ignoreDuplicate, stronglyCorrelated));
+    }
+
+    /**
+     * 添加需要忽略重复的书签
+     *
+     * @param id 书签id
+     * @return 忽略结果
+     * @author wangbinzhe
+     * @version 1.0.0.0
+     * @since 11:19 2025/9/17
+     */
+    @PatchMapping("/duplicate/check/{id}/ignore")
+    public Result<String> duplicateCheckMarkIgnore(@PathVariable("id") String id) {
+        // 立即启动异步任务，不等待结果
+        bookmarkService.duplicateCheckMarkIgnore(id);
+        return Result.ok();
     }
 
     /**

@@ -4,10 +4,10 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
 import java.util.Date;
 import java.util.Objects;
-
-import lombok.Data;
 
 /**
  * 书签
@@ -71,6 +71,12 @@ public class SnBookmark {
      */
     @TableField(value = "num")
     private Integer num;
+
+    /**
+     * 是否检查重复时忽略
+     */
+    @TableField(value = "ignore_duplicate")
+    private Boolean ignoreDuplicate;
 
     @TableField(value = "star")
     private Boolean star;

@@ -1,0 +1,1 @@
+ALTER TABLE sn_bookmark ADD COLUMN `ignore_duplicate` tinyint(1) DEFAULT '0' COMMENT '是否检查重复时忽略';

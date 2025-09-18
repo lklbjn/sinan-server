@@ -15,6 +15,7 @@
     <result column="icon" jdbcType="LONGVARCHAR" property="icon" />
     <result column="num" jdbcType="INTEGER" property="num" />
     <result column="star" jdbcType="BOOLEAN" property="star" />
+    <result column="ignore_duplicate" jdbcType="BOOLEAN" property="ignoreDuplicate" />
     <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
     <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
     <result column="deleted" jdbcType="INTEGER" property="deleted" />
@@ -22,6 +23,6 @@
   <sql id="Base_Column_List">
     <!--@mbg.generated-->
     id, user_id, space_id, `name`, pinyin, abbreviation, description, url, icon, num, 
-    star, create_time, update_time, deleted
+    star, ignore_duplicate, create_time, update_time, deleted
   </sql>
 </mapper>

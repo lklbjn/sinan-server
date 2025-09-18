@@ -57,6 +57,11 @@ public class BookmarkResp {
     private Boolean star;
 
     /**
+     * 是否检查重复时忽略
+     */
+    private Boolean ignoreDuplicate;
+
+    /**
      * 书签标签列表
      */
     private List<TagResp> tags;
@@ -71,6 +76,7 @@ public class BookmarkResp {
         bookmarkVO.setIcon(snBookmark.getIcon());
         bookmarkVO.setNum(snBookmark.getNum());
         bookmarkVO.setStar(snBookmark.getStar());
+        bookmarkVO.setIgnoreDuplicate(snBookmark.getIgnoreDuplicate());
         return bookmarkVO;
     }
 
