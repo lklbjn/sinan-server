@@ -5,8 +5,11 @@ on:
     branches:
       - main
       - develop
+    tags:
+      - '*'
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,7 +17,7 @@ jobs:
     environment: RUNTIME
     env:
       REGISTRY: ghcr.io
-      NAMESPACE: PeixyJ
+      NAMESPACE: lklbjn
       IMAGE_NAME: sinan-server
       REGISTRY_USERNAME: ${{ secrets.GHCR_REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.GHCR_REGISTRY_PASSWORD }}
