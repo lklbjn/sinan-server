@@ -2,14 +2,13 @@ package pres.peixinyi.sinan.model.sinan.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import pres.peixinyi.sinan.model.sinan.entity.SnShareSpaceAssUser;
 import pres.peixinyi.sinan.model.sinan.mapper.SnShareSpaceAssUserMapper;
+
+import java.util.List;
 
 @Service
 public class SnShareSpaceAssUserService extends ServiceImpl<SnShareSpaceAssUserMapper, SnShareSpaceAssUser> {
@@ -42,5 +41,11 @@ public class SnShareSpaceAssUserService extends ServiceImpl<SnShareSpaceAssUserM
                 .eq(SnShareSpaceAssUser::getSpaceId, spaceId)
                 .eq(SnShareSpaceAssUser::getUserId, currentUserId)
                 .count() > 0;
+    }
+
+    public List<String> getSpaceIdsByUserId(String userId) {
+        return lambdaQuery().eq(SnShareSpaceAssUser::getUserId, userId)
+                .select(SnShareSpaceAssUser::getSpaceId)
+                .list().stream().map(SnShareSpaceAssUser::getSpaceId).toList();
     }
 }

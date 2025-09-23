@@ -424,13 +424,14 @@ public class ApiController {
     public Result<List<BookmarkResp>> getMostVisitedBookmarks(
             @RequestHeader("X-Access-Key") String accessKey,
             @RequestParam(value = "limit", defaultValue = "10") int limit,
-            @RequestParam(value = "search", required = false) String search) {
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "withSubscription", required = false) Boolean withSubscription) {
         String userId = authenticateUser(accessKey);
         if (userId == null) {
             return Result.fail("无效的访问密钥");
         }
         // 获取最常访问的书签
-        List<SnBookmark> bookmarks = bookmarkService.getMostVisitedBookmarks(limit, search, userId);
+        List<SnBookmark> bookmarks = bookmarkService.getMostVisitedBookmarks(limit, search, withSubscription, userId);
 
         if (bookmarks.isEmpty()) {
             return Result.success(List.of());

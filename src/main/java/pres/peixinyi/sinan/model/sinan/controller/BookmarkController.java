@@ -131,10 +131,11 @@ public class BookmarkController {
      */
     @GetMapping("/most-visited")
     public Result<List<BookmarkResp>> getMostVisitedBookmarks(@RequestParam(value = "limit", defaultValue = "10") int limit,
-                                                              @RequestParam(value = "search", required = false) String search) {
+                                                              @RequestParam(value = "search", required = false) String search,
+                                                              @RequestParam(value = "withSubscription", required = false, defaultValue = "true") Boolean withSubscription) {
         String userId = StpUtil.getLoginIdAsString();
         // 获取最常访问的书签
-        List<SnBookmark> bookmarks = bookmarkService.getMostVisitedBookmarks(limit, search, userId);
+        List<SnBookmark> bookmarks = bookmarkService.getMostVisitedBookmarks(limit, search, withSubscription, userId);
 
         if (bookmarks.isEmpty()) {
             return Result.success(List.of());
