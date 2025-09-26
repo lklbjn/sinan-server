@@ -14,6 +14,7 @@ import pres.peixinyi.sinan.common.Result;
 import pres.peixinyi.sinan.dto.request.AddBookmarkReq;
 import pres.peixinyi.sinan.dto.response.BookmarkResp;
 import pres.peixinyi.sinan.dto.response.BookmarkTreeResp;
+import pres.peixinyi.sinan.dto.response.TagResp;
 import pres.peixinyi.sinan.model.sinan.entity.SnBookmark;
 import pres.peixinyi.sinan.model.sinan.entity.SnBookmarkAssTag;
 import pres.peixinyi.sinan.model.sinan.entity.SnSpace;
@@ -572,6 +573,37 @@ public class ApiController {
             return Result.success(spaces);
         } catch (Exception e) {
             return Result.fail("获取空间列表失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取用户的所有标签
+     *
+     * @param accessKey 访问密钥
+     * @return 标签列表
+     */
+    @GetMapping("/tags")
+    public Result<List<TagResp>> getAllTags(
+            @RequestHeader("X-Access-Key") String accessKey) {
+
+        // 验证访问密钥
+        String userId = authenticateUser(accessKey);
+        if (userId == null) {
+            return Result.fail("无效的访问密钥");
+        }
+
+        try {
+            // 获取用户的所有标签
+            List<SnTag> tags = tagService.getUserTags(userId);
+
+            // 转换为响应对象
+            List<TagResp> tagRespList = tags.stream()
+                    .map(TagResp::from)
+                    .toList();
+
+            return Result.success(tagRespList);
+        } catch (Exception e) {
+            return Result.fail("获取标签列表失败: " + e.getMessage());
         }
     }
 
