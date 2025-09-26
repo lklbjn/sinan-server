@@ -40,7 +40,7 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
 
     public List<SnBookmark> getMostVisitedBookmarks(int limit, String search, Boolean withSubscription, String userId) {
         List<String> spaceIds = shareSpaceAssUserService.getSpaceIdsByUserId(userId);
-        if (spaceIds == null && withSubscription) {
+        if (spaceIds.isEmpty() && withSubscription) {
             return new ArrayList<>();
         }
         return lambdaQuery()

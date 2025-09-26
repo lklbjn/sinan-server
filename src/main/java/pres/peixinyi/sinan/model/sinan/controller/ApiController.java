@@ -425,7 +425,7 @@ public class ApiController {
             @RequestHeader("X-Access-Key") String accessKey,
             @RequestParam(value = "limit", defaultValue = "10") int limit,
             @RequestParam(value = "search", required = false) String search,
-            @RequestParam(value = "withSubscription", required = false) Boolean withSubscription) {
+            @RequestParam(value = "withSubscription", required = false, defaultValue = "true") Boolean withSubscription) {
         String userId = authenticateUser(accessKey);
         if (userId == null) {
             return Result.fail("无效的访问密钥");
