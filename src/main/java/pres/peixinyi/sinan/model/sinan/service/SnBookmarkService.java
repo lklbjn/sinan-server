@@ -1008,4 +1008,11 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
                 .set(SnBookmark::getIgnoreDuplicate, true)
                 .update();
     }
+
+    public boolean checkBookmarkIdIsSubscription(String userId, String id) {
+        List<String> spaceIds = shareSpaceAssUserService.getSpaceIdsByUserId(userId);
+        return lambdaQuery().eq(SnBookmark::getId, id)
+                .in(SnBookmark::getSpaceId, spaceIds)
+                .exists();
+    }
 }

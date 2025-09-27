@@ -83,6 +83,9 @@ public class BookmarkController {
         // 检查书签是否存在且属于当前用户
         SnBookmark bookmark = bookmarkService.getBookmarkByUserAndId(id, currentUserId);
         if (bookmark == null) {
+            if (bookmarkService.checkBookmarkIdIsSubscription(currentUserId, id)){
+                return Result.success();
+            }
             return Result.fail("书签不存在或无权限访问");
         }
 
