@@ -44,17 +44,6 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
             return new ArrayList<>();
         }
         return lambdaQuery()
-                .eq(SnBookmark::getDeleted, 0)
-                .and(!withSubscription, a -> a.eq(SnBookmark::getUserId, userId)
-                        .like(search != null && !search.isEmpty(), SnBookmark::getName, search)
-                        .or()
-                        .like(search != null && !search.isEmpty(), SnBookmark::getUrl, search)
-                        .or()
-                        .like(search != null && !search.isEmpty(), SnBookmark::getDescription, search)
-                        .or()
-                        .like(search != null && !search.isEmpty(), SnBookmark::getPinyin, search)
-                        .or()
-                        .like(search != null && !search.isEmpty(), SnBookmark::getAbbreviation, search))
                 .and(withSubscription,
                         o -> o.in(SnBookmark::getSpaceId, spaceIds)
                                 .like(search != null && !search.isEmpty(), SnBookmark::getName, search)
@@ -66,6 +55,16 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
                                 .like(search != null && !search.isEmpty(), SnBookmark::getPinyin, search)
                                 .or()
                                 .like(search != null && !search.isEmpty(), SnBookmark::getAbbreviation, search))
+                .or(a -> a.eq(SnBookmark::getUserId, userId)
+                        .like(search != null && !search.isEmpty(), SnBookmark::getName, search)
+                        .or()
+                        .like(search != null && !search.isEmpty(), SnBookmark::getUrl, search)
+                        .or()
+                        .like(search != null && !search.isEmpty(), SnBookmark::getDescription, search)
+                        .or()
+                        .like(search != null && !search.isEmpty(), SnBookmark::getPinyin, search)
+                        .or()
+                        .like(search != null && !search.isEmpty(), SnBookmark::getAbbreviation, search))
                 .orderByDesc(SnBookmark::getStar)
                 .orderByDesc(SnBookmark::getNum)
                 .orderByDesc(SnBookmark::getCreateTime)
@@ -750,11 +749,13 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
                 .one();
     }
 
-    public List<SnBookmark> searchBookmarks(String userId, String trim) {
+    public List<SnBookmark> searchBookmarks(String userId, String trim, Boolean withSubscription) {
+        List<String> spaceIds = shareSpaceAssUserService.getSpaceIdsByUserId(userId);
+        if (spaceIds.isEmpty() && withSubscription) {
+            return new ArrayList<>();
+        }
         return lambdaQuery()
-                .eq(SnBookmark::getUserId, userId)
-                .eq(SnBookmark::getDeleted, 0)
-                .and(wrapper -> wrapper
+                .and(withSubscription, wrapper -> wrapper.in(SnBookmark::getSpaceId, spaceIds)
                         .like(SnBookmark::getName, trim)
                         .or()
                         .like(SnBookmark::getDescription, trim)
@@ -763,15 +764,29 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
                         .or()
                         .like(SnBookmark::getPinyin, trim)
                         .or()
-                        .like(SnBookmark::getAbbreviation, trim)
-                )
+                        .like(SnBookmark::getAbbreviation, trim))
+                .or(wrapper -> wrapper.eq(SnBookmark::getUserId, userId)
+                        .like(SnBookmark::getName, trim)
+                        .or()
+                        .like(SnBookmark::getDescription, trim)
+                        .or()
+                        .like(SnBookmark::getUrl, trim)
+                        .or()
+                        .like(SnBookmark::getPinyin, trim)
+                        .or()
+                        .like(SnBookmark::getAbbreviation, trim))
                 .orderByDesc(SnBookmark::getUpdateTime)
                 .list();
     }
 
-    public List<SnBookmark> getAllBookmarks(String userId) {
+    public List<SnBookmark> getAllBookmarks(String userId, Boolean withSubscription) {
+        List<String> spaceIds = shareSpaceAssUserService.getSpaceIdsByUserId(userId);
+        if (spaceIds.isEmpty() && withSubscription) {
+            return new ArrayList<>();
+        }
         return lambdaQuery()
-                .eq(SnBookmark::getUserId, userId)
+                .and(a ->
+                        a.eq(SnBookmark::getUserId, userId).or().in(SnBookmark::getSpaceId, spaceIds))
                 .eq(SnBookmark::getDeleted, 0)
                 .orderByDesc(SnBookmark::getUpdateTime)
                 .list();

@@ -344,7 +344,8 @@ public class ApiController {
     @GetMapping("/bookmarks")
     public Result<List<BookmarkResp>> getBookmark(
             @RequestHeader("X-Access-Key") String accessKey,
-            @RequestParam(value = "search", required = false) String search) {
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "withSubscription", required = false, defaultValue = "true") Boolean withSubscription) {
         String userId = authenticateUser(accessKey);
         if (userId == null) {
             return Result.fail("无效的访问密钥");
@@ -352,9 +353,9 @@ public class ApiController {
         try {
             List<SnBookmark> bookmarks;
             if (search != null && !search.trim().isEmpty()) {
-                bookmarks = bookmarkService.searchBookmarks(userId, search.trim());
+                bookmarks = bookmarkService.searchBookmarks(userId, search.trim(), withSubscription);
             } else {
-                bookmarks = bookmarkService.getAllBookmarks(userId);
+                bookmarks = bookmarkService.getAllBookmarks(userId, withSubscription);
             }
 
             if (bookmarks.isEmpty()) {
