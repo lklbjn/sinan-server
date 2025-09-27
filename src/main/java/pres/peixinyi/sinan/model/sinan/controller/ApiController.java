@@ -325,6 +325,38 @@ public class ApiController {
                 bookmarkTree.add(unclassified);
             }
 
+            // 处理订阅的书签
+            List<SnBookmark> subsBookmarks = bookmarkService.getSubscriptionBookmarks(userId);
+            if (!subsBookmarks.isEmpty()) {
+                // 批量获取书签的标签信息
+                List<String> bookmarkIds = subsBookmarks.stream()
+                        .map(SnBookmark::getId).toList();
+                Map<String, List<SnTag>> bookmarkTagsMap = bookmarkService.getBatchBookmarkTags(bookmarkIds);
+
+                // 构建书签响应对象，使用格式化的名称
+                List<BookmarkResp> bookmarkResp = subsBookmarks.stream()
+                        .map(bookmark -> {
+                            List<SnTag> tags = bookmarkTagsMap.getOrDefault(bookmark.getId(), List.of());
+                            BookmarkResp resp = BookmarkResp.from(bookmark, tags);
+
+                            // 设置格式化的名称（没有空间的情况）
+                            String formattedName = buildFormattedBookmarkName(bookmark, null, tags, pinyin);
+                            resp.setName(formattedName);
+
+                            return resp;
+                        })
+                        .toList();
+
+                // 创建一个虚拟的"未分类"空间
+                BookmarkTreeResp subscription = new BookmarkTreeResp();
+                subscription.setSpaceId(null);
+                subscription.setSpaceName("SHARE_SUBSCRIPTION");
+                subscription.setSpaceDescription("Subscription bookmarks");
+                subscription.setBookmarks(bookmarkResp);
+
+                bookmarkTree.add(subscription);
+            }
+
             return Result.success(bookmarkTree);
 
         } catch (Exception e) {

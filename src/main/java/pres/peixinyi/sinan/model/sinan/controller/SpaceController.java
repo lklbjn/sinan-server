@@ -71,7 +71,7 @@ public class SpaceController {
     }
 
     /**
-     * 根据ID获取��间详情
+     * 根据ID获取空间详情
      *
      * @param id 空间ID
      * @return 空间详情
@@ -104,6 +104,10 @@ public class SpaceController {
     @PostMapping
     public Result<SpaceResp> addSpace(@Valid @RequestBody AddSpaceReq req) {
         String currentUserId = StpUtil.getLoginIdAsString();
+
+        if ("SHARE_SUBSCRIPTION".equals(req.getName())){
+            return Result.fail("系统预设名称，禁止创建");
+        }
 
         // 检查空间名称是否已存在
         if (spaceService.isSpaceNameExists(currentUserId, req.getName(), null)) {

@@ -792,6 +792,17 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
                 .list();
     }
 
+    public List<SnBookmark> getSubscriptionBookmarks(String userId) {
+        List<String> spaceIds = shareSpaceAssUserService.getSpaceIdsByUserId(userId);
+        if (spaceIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return lambdaQuery()
+                .in(SnBookmark::getSpaceId, spaceIds)
+                .orderByDesc(SnBookmark::getUpdateTime)
+                .list();
+    }
+
     public Map<String, List<BookmarkResp>> duplicateCheck(String userId, Integer level,
                                                           Boolean ignoreDuplicate, Boolean stronglyCorrelated) {
         // 获取用户书签列表
