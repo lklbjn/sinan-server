@@ -151,12 +151,21 @@ public class BookmarkController {
         Map<String, List<SnTag>> bookmarkTagsMap =
                 bookmarkService.getBatchBookmarkTags(bookmarkIds);
 
-        // 构建响应对象，包含标签信息
+        // 构建响应对象，包含标签信息和订阅状态
         List<BookmarkResp> bookmarkResponses = bookmarks.stream()
                 .map(bookmark -> {
                     List<SnTag> tags =
                             bookmarkTagsMap.getOrDefault(bookmark.getId(), List.of());
-                    return BookmarkResp.from(bookmark, tags);
+
+                    // 检查订阅状态
+                    Boolean subscribed = false;
+                    String spaceId = bookmark.getSpaceId();
+                    if (spaceId != null && !spaceId.isEmpty()) {
+                        // 如果书签有空间，检查当前用户是否订阅了该空间
+                        subscribed = snShareSpaceAssUserService.isCollection(spaceId, userId);
+                    }
+
+                    return BookmarkResp.from(bookmark, tags, subscribed);
                 })
                 .toList();
 
@@ -502,9 +511,37 @@ public class BookmarkController {
         String currentUserId = StpUtil.getLoginIdAsString();
 
         List<SnBookmark> starredBookmarks = bookmarkService.getStarredBookmarks(currentUserId, limit);
-        return Result.success(starredBookmarks.stream()
-                .map(BookmarkResp::from)
-                .toList());
+
+        if (starredBookmarks.isEmpty()) {
+            return Result.success(List.of());
+        }
+
+        // 批量获取书签的标签信息
+        List<String> bookmarkIds = starredBookmarks.stream()
+                .map(SnBookmark::getId)
+                .toList();
+        Map<String, List<SnTag>> bookmarkTagsMap =
+                bookmarkService.getBatchBookmarkTags(bookmarkIds);
+
+        // 构建响应对象，包含标签信息和订阅状态
+        List<BookmarkResp> bookmarkResponses = starredBookmarks.stream()
+                .map(bookmark -> {
+                    List<SnTag> tags =
+                            bookmarkTagsMap.getOrDefault(bookmark.getId(), List.of());
+
+                    // 检查订阅状态
+                    Boolean subscribed = false;
+                    String spaceId = bookmark.getSpaceId();
+                    if (spaceId != null && !spaceId.isEmpty()) {
+                        // 如果书签有空间，检查当前用户是否订阅了该空间
+                        subscribed = snShareSpaceAssUserService.isCollection(spaceId, currentUserId);
+                    }
+
+                    return BookmarkResp.from(bookmark, tags, subscribed);
+                })
+                .toList();
+
+        return Result.success(bookmarkResponses);
     }
 
     /**

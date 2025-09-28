@@ -57,6 +57,11 @@ public class BookmarkResp {
     private Boolean star;
 
     /**
+     * 是否已订阅
+     */
+    private Boolean subscribed;
+
+    /**
      * 书签标签列表
      */
     private List<TagResp> tags;
@@ -90,6 +95,20 @@ public class BookmarkResp {
         } else {
             bookmarkResp.setTags(List.of());
         }
+        return bookmarkResp;
+    }
+
+    /**
+     * 从书签实体、标签列表和订阅状态创建响应对象
+     *
+     * @param snBookmark 书签实体
+     * @param tags       标签列表
+     * @param subscribed 是否已订阅该书签所在的空间
+     * @return 书签响应对象
+     */
+    public static BookmarkResp from(SnBookmark snBookmark, List<SnTag> tags, Boolean subscribed) {
+        BookmarkResp bookmarkResp = from(snBookmark, tags);
+        bookmarkResp.setSubscribed(subscribed);
         return bookmarkResp;
     }
 
