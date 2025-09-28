@@ -40,11 +40,8 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
 
     public List<SnBookmark> getMostVisitedBookmarks(int limit, String search, Boolean withSubscription, String userId) {
         List<String> spaceIds = shareSpaceAssUserService.getSpaceIdsByUserId(userId);
-        if (spaceIds.isEmpty() && withSubscription) {
-            return new ArrayList<>();
-        }
         return lambdaQuery()
-                .and(withSubscription,
+                .and(withSubscription && !spaceIds.isEmpty(),
                         o -> o.in(SnBookmark::getSpaceId, spaceIds)
                                 .like(search != null && !search.isEmpty(), SnBookmark::getName, search)
                                 .or()
@@ -751,20 +748,18 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
 
     public List<SnBookmark> searchBookmarks(String userId, String trim, Boolean withSubscription) {
         List<String> spaceIds = shareSpaceAssUserService.getSpaceIdsByUserId(userId);
-        if (spaceIds.isEmpty() && withSubscription) {
-            return new ArrayList<>();
-        }
         return lambdaQuery()
-                .and(withSubscription, wrapper -> wrapper.in(SnBookmark::getSpaceId, spaceIds)
-                        .like(SnBookmark::getName, trim)
-                        .or()
-                        .like(SnBookmark::getDescription, trim)
-                        .or()
-                        .like(SnBookmark::getUrl, trim)
-                        .or()
-                        .like(SnBookmark::getPinyin, trim)
-                        .or()
-                        .like(SnBookmark::getAbbreviation, trim))
+                .and(withSubscription && !spaceIds.isEmpty(),
+                        wrapper -> wrapper.in(SnBookmark::getSpaceId, spaceIds)
+                                .like(SnBookmark::getName, trim)
+                                .or()
+                                .like(SnBookmark::getDescription, trim)
+                                .or()
+                                .like(SnBookmark::getUrl, trim)
+                                .or()
+                                .like(SnBookmark::getPinyin, trim)
+                                .or()
+                                .like(SnBookmark::getAbbreviation, trim))
                 .or(wrapper -> wrapper.eq(SnBookmark::getUserId, userId)
                         .like(SnBookmark::getName, trim)
                         .or()
