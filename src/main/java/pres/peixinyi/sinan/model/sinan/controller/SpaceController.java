@@ -71,7 +71,7 @@ public class SpaceController {
     }
 
     /**
-     * 根据ID获取��间详情
+     * 根据ID获取空间详情
      *
      * @param id 空间ID
      * @return 空间详情

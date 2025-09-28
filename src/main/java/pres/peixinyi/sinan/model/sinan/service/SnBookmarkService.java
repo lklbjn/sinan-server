@@ -38,23 +38,32 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
     @Resource
     private SnTagService tagService;
 
+    @Resource
+    private SnShareSpaceAssUserService snShareSpaceAssUserService;
+
     public List<SnBookmark> getMostVisitedBookmarks(int limit, String search, String userId) {
+        // 获取用户订阅空间ID列表
+        List<String> subscribedSpaceIds = snShareSpaceAssUserService.getByUserId(userId)
+            .stream()
+            .map(ass -> ass.getSpaceId())
+            .collect(Collectors.toList());
+
+        // 构建查询条件：用户自己的书签 或 订阅空间的书签
         return lambdaQuery()
                 .eq(SnBookmark::getDeleted, 0)
-                .eq(SnBookmark::getUserId, userId)
-                .like(search != null && !search.isEmpty(), SnBookmark::getName, search)
-                .or()
-                .eq(SnBookmark::getUserId, userId)
-                .like(search != null && !search.isEmpty(), SnBookmark::getUrl, search)
-                .or()
-                .eq(SnBookmark::getUserId, userId)
-                .like(search != null && !search.isEmpty(), SnBookmark::getDescription, search)
-                .or()
-                .eq(SnBookmark::getUserId, userId)
-                .like(search != null && !search.isEmpty(), SnBookmark::getPinyin, search)
-                .or()
-                .eq(SnBookmark::getUserId, userId)
-                .like(search != null && !search.isEmpty(), SnBookmark::getAbbreviation, search)
+                .and(wrapper -> {
+                    wrapper.eq(SnBookmark::getUserId, userId);
+                    if (subscribedSpaceIds != null && !subscribedSpaceIds.isEmpty()) {
+                        wrapper.or().in(SnBookmark::getSpaceId, subscribedSpaceIds);
+                    }
+                })
+                .and(search != null && !search.isEmpty(), wrapper -> {
+                    wrapper.like(SnBookmark::getName, search)
+                        .or().like(SnBookmark::getUrl, search)
+                        .or().like(SnBookmark::getDescription, search)
+                        .or().like(SnBookmark::getPinyin, search)
+                        .or().like(SnBookmark::getAbbreviation, search);
+                })
                 .orderByDesc(SnBookmark::getStar)
                 .orderByDesc(SnBookmark::getNum)
                 .orderByDesc(SnBookmark::getCreateTime)

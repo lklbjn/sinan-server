@@ -19,10 +19,7 @@ import pres.peixinyi.sinan.model.sinan.entity.SnBookmark;
 import pres.peixinyi.sinan.model.sinan.entity.SnBookmarkAssTag;
 import pres.peixinyi.sinan.model.sinan.entity.SnSpace;
 import pres.peixinyi.sinan.model.sinan.entity.SnTag;
-import pres.peixinyi.sinan.model.sinan.service.SnBookmarkAssTagService;
-import pres.peixinyi.sinan.model.sinan.service.SnBookmarkService;
-import pres.peixinyi.sinan.model.sinan.service.SnSpaceService;
-import pres.peixinyi.sinan.model.sinan.service.SnTagService;
+import pres.peixinyi.sinan.model.sinan.service.*;
 import pres.peixinyi.sinan.model.rbac.service.SnUserKeyService;
 import pres.peixinyi.sinan.model.favicon.service.FaviconService;
 import pres.peixinyi.sinan.utils.PinyinUtils;
@@ -30,6 +27,7 @@ import pres.peixinyi.sinan.utils.PinyinUtils;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +62,9 @@ public class ApiController {
 
     @Resource
     private FaviconService faviconService;
+
+    @Resource
+    private SnShareSpaceAssUserService snShareSpaceAssUserService;
 
     /**
      * 验证访问密钥并获取用户ID
@@ -260,72 +261,81 @@ public class ApiController {
             // 获取用户的所有空间
             List<SnSpace> spaces = spaceService.getUserSpaces(userId);
 
-            // 构建书签树
+            // 构建书签树（用户自己的空间）
             List<BookmarkTreeResp> bookmarkTree = spaces.stream()
                     .map(space -> {
-                        // 获取该空间下的所有书签
                         List<SnBookmark> bookmarks = bookmarkService.getBookmarksBySpaceId(space.getId(), userId);
-
                         if (bookmarks.isEmpty()) {
                             return BookmarkTreeResp.from(space, List.of());
                         }
-
-                        // 批量获取书签的标签信息
-                        List<String> bookmarkIds = bookmarks.stream()
-                                .map(SnBookmark::getId)
-                                .toList();
-                        Map<String, List<SnTag>> bookmarkTagsMap =
-                                bookmarkService.getBatchBookmarkTags(bookmarkIds);
-
-                        // 构建书签响应对象，使用格式化的名称
+                        List<String> bookmarkIds = bookmarks.stream().map(SnBookmark::getId).toList();
+                        Map<String, List<SnTag>> bookmarkTagsMap = bookmarkService.getBatchBookmarkTags(bookmarkIds);
                         List<BookmarkResp> bookmarkResps = bookmarks.stream()
                                 .map(bookmark -> {
                                     List<SnTag> tags = bookmarkTagsMap.getOrDefault(bookmark.getId(), List.of());
                                     BookmarkResp resp = BookmarkResp.from(bookmark, tags);
-
-                                    // 设置格式化的名称
                                     String formattedName = buildFormattedBookmarkName(bookmark, space, tags, pinyin);
                                     resp.setName(formattedName);
-
                                     return resp;
                                 })
                                 .toList();
-
                         return BookmarkTreeResp.from(space, bookmarkResps);
                     })
                     .collect(Collectors.toList());
 
+            // 获取用户订阅空间ID列表
+            List<String> subscribedSpaceIds = snShareSpaceAssUserService.getByUserId(userId)
+                .stream()
+                .map(ass -> ass.getSpaceId())
+                .distinct()
+                .toList();
+            if (subscribedSpaceIds != null && !subscribedSpaceIds.isEmpty()) {
+                // 查询订阅空间信息
+                List<SnSpace> subSpaces = spaceService.getSpacesByIds(subscribedSpaceIds);
+                for (SnSpace subSpace : subSpaces) {
+                    // 获取订阅空间下所有书签（不限制userId）
+                    List<SnBookmark> subBookmarks = bookmarkService.getBookmarksBySpaceId(subSpace.getId());
+                    List<String> subBookmarkIds = subBookmarks.stream().map(SnBookmark::getId).toList();
+                    Map<String, List<SnTag>> subBookmarkTagsMap = bookmarkService.getBatchBookmarkTags(subBookmarkIds);
+                    List<BookmarkResp> subBookmarkResps = subBookmarks.stream()
+                            .map(bookmark -> {
+                                List<SnTag> tags = subBookmarkTagsMap.getOrDefault(bookmark.getId(), List.of());
+                                BookmarkResp resp = BookmarkResp.from(bookmark, tags);
+                                // 格式化名称
+                                String formattedName = buildFormattedBookmarkName(bookmark, subSpace, tags, pinyin);
+                                resp.setName(formattedName);
+                                return resp;
+                            })
+                            .toList();
+                    // 构建订阅空间节点，空间名称加SUB-前缀
+                    BookmarkTreeResp subTree = new BookmarkTreeResp();
+                    subTree.setSpaceId(subSpace.getId());
+                    subTree.setSpaceName("SUB-" + subSpace.getName());
+                    subTree.setSpaceDescription(subSpace.getDescription());
+                    subTree.setBookmarks(subBookmarkResps);
+                    bookmarkTree.add(subTree);
+                }
+            }
+
             // 处理没有空间的书签（无命名空间的书签）
             List<SnBookmark> noSpaceBookmarks = bookmarkService.getNoNamespaceBookmarks(userId);
             if (!noSpaceBookmarks.isEmpty()) {
-                // 批量获取书签的标签信息
-                List<String> bookmarkIds = noSpaceBookmarks.stream()
-                        .map(SnBookmark::getId)
-                        .toList();
-                Map<String, List<SnTag>> bookmarkTagsMap =
-                        bookmarkService.getBatchBookmarkTags(bookmarkIds);
-
-                // 构建书签响应对象，使用格式化的名称
+                List<String> bookmarkIds = noSpaceBookmarks.stream().map(SnBookmark::getId).toList();
+                Map<String, List<SnTag>> bookmarkTagsMap = bookmarkService.getBatchBookmarkTags(bookmarkIds);
                 List<BookmarkResp> bookmarkResps = noSpaceBookmarks.stream()
                         .map(bookmark -> {
                             List<SnTag> tags = bookmarkTagsMap.getOrDefault(bookmark.getId(), List.of());
                             BookmarkResp resp = BookmarkResp.from(bookmark, tags);
-
-                            // 设置格式化的名称（没有空间的情况）
                             String formattedName = buildFormattedBookmarkName(bookmark, null, tags, pinyin);
                             resp.setName(formattedName);
-
                             return resp;
                         })
                         .toList();
-
-                // 创建一个虚拟的"未分类"空间
                 BookmarkTreeResp unclassified = new BookmarkTreeResp();
                 unclassified.setSpaceId(null);
                 unclassified.setSpaceName("未分类");
                 unclassified.setSpaceDescription("没有分配到任何空间的书签");
                 unclassified.setBookmarks(bookmarkResps);
-
                 bookmarkTree.add(unclassified);
             }
 
@@ -354,11 +364,31 @@ public class ApiController {
             return Result.fail("无效的访问密钥");
         }
         try {
-            List<SnBookmark> bookmarks;
+            // 获取用户订阅空间ID列表
+            List<String> subscribedSpaceIds = snShareSpaceAssUserService.getByUserId(userId)
+                .stream()
+                .map(ass -> ass.getSpaceId())
+                .toList();
+
+            List<SnBookmark> bookmarks = new ArrayList<>();
             if (search != null && !search.trim().isEmpty()) {
-                bookmarks = bookmarkService.searchBookmarks(userId, search.trim());
+                // 用户自己的书签
+                bookmarks.addAll(bookmarkService.searchBookmarks(userId, search.trim()));
+                // 订阅空间的书签
+                if (subscribedSpaceIds != null && !subscribedSpaceIds.isEmpty()) {
+                    for (String spaceId : subscribedSpaceIds) {
+                        bookmarks.addAll(bookmarkService.searchBookmarksBySpaceId(spaceId, search.trim()));
+                    }
+                }
             } else {
-                bookmarks = bookmarkService.getAllBookmarks(userId);
+                // 用户自己的全部书签
+                bookmarks.addAll(bookmarkService.getAllBookmarks(userId));
+                // 订阅空间的全部书签
+                if (subscribedSpaceIds != null && !subscribedSpaceIds.isEmpty()) {
+                    for (String spaceId : subscribedSpaceIds) {
+                        bookmarks.addAll(bookmarkService.getBookmarksBySpaceId(spaceId));
+                    }
+                }
             }
 
             if (bookmarks.isEmpty()) {

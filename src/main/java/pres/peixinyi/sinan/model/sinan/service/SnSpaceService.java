@@ -265,4 +265,12 @@ public class SnSpaceService extends ServiceImpl<SnSpaceMapper, SnSpace> {
     }
 
 
+    public List<SnSpace> getSpacesByIds(List<String> subscribedSpaceIds) {
+        return lambdaQuery()
+                .in(SnSpace::getId, subscribedSpaceIds)
+                .eq(SnSpace::getDeleted, 0)
+                .orderByAsc(SnSpace::getSort)
+                .orderByDesc(SnSpace::getCreateTime)
+                .list();
+    }
 }
