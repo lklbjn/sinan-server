@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,6 +26,8 @@ import pres.peixinyi.sinan.model.sinan.mapper.SnBookmarkMapper;
 import pres.peixinyi.sinan.model.sinan.entity.SnBookmark;
 import pres.peixinyi.sinan.model.sinan.entity.SnTag;
 import pres.peixinyi.sinan.dto.response.ImportBookmarkResp;
+import pres.peixinyi.sinan.dto.request.CheckDuplicateReq;
+import pres.peixinyi.sinan.dto.response.CheckDuplicateResp;
 import jakarta.annotation.Resource;
 import pres.peixinyi.sinan.utils.PinyinUtils;
 
@@ -40,6 +43,9 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
 
     @Resource
     private SnShareSpaceAssUserService snShareSpaceAssUserService;
+
+    @Resource
+    private SnIgnoredGroupService ignoredGroupService;
 
     public List<SnBookmark> getMostVisitedBookmarks(int limit, String search, String userId) {
         // 获取用户订阅空间ID列表
@@ -773,6 +779,622 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
                 .eq(SnBookmark::getDeleted, 0)
                 .orderByDesc(SnBookmark::getUpdateTime)
                 .list();
+    }
+
+    /**
+     * 获取用户的重复书签
+     *
+     * @param userId 用户ID
+     * @return 重复书签列表，按URL分组
+     */
+    public List<SnBookmark> getDuplicateBookmarks(String userId) {
+        // 使用子查询找出重复的URL
+        return lambdaQuery()
+                .eq(SnBookmark::getUserId, userId)
+                .eq(SnBookmark::getDeleted, 0)
+                .in(SnBookmark::getUrl,
+                    lambdaQuery()
+                        .select(SnBookmark::getUrl)
+                        .eq(SnBookmark::getUserId, userId)
+                        .eq(SnBookmark::getDeleted, 0)
+                        .groupBy(SnBookmark::getUrl)
+                        .having("count(*) > 1")
+                        .list()
+                        .stream()
+                        .map(SnBookmark::getUrl)
+                        .toList())
+                .orderByDesc(SnBookmark::getUpdateTime)
+                .list();
+    }
+
+    /**
+     * 根据匹配等级获取重复书签
+     *
+     * @param userId 用户ID
+     * @param level  匹配等级 (2-4, 2=1级域名, 3=2级域名, 4=3级域名)
+     * @return 重复书签列表
+     */
+    /**
+     * 根据匹配等级获取重复书签
+     *
+     * @param userId 用户ID
+     * @param level 匹配等级 (1: 完整URL匹配，2: 二级域名匹配，3: 三级域名匹配)
+     * @return 重复书签列表
+     */
+    public List<SnBookmark> getDuplicateBookmarks(String userId, int level) {
+        // 获取用户的所有忽略组
+        List<String> ignoredGroups = ignoredGroupService.getUserIgnoredGroups(userId);
+
+        // 获取所有书签
+        List<SnBookmark> allBookmarks = lambdaQuery()
+                .eq(SnBookmark::getUserId, userId)
+                .eq(SnBookmark::getDeleted, 0)
+                .orderByDesc(SnBookmark::getUpdateTime)
+                .list();
+
+        // 根据匹配等级分组书签
+        Map<String, List<SnBookmark>> groupedBookmarks = groupBookmarksByLevel(allBookmarks, level);
+
+        // 返回重复的书签（分组中超过1个的书签），过滤掉被忽略的组
+        return groupedBookmarks.values().stream()
+                .filter(bookmarks -> bookmarks.size() > 1)
+                .filter(bookmarks -> !ignoredGroups.contains(bookmarks.get(0).getUrl())) // 使用URL作为分组键的近似判断
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取重复书签分组信息
+     *
+     * @param userId 用户ID
+     * @return 按URL分组的重复书签统计
+     */
+    public Map<String, Long> getDuplicateUrlGroups(String userId) {
+        // 获取重复URL列表
+        List<String> duplicateUrls = lambdaQuery()
+                .select(SnBookmark::getUrl)
+                .eq(SnBookmark::getUserId, userId)
+                .eq(SnBookmark::getDeleted, 0)
+                .groupBy(SnBookmark::getUrl)
+                .having("count(*) > 1")
+                .list()
+                .stream()
+                .map(SnBookmark::getUrl)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 统计每个URL的数量
+        Map<String, Long> result = new HashMap<>();
+        for (String url : duplicateUrls) {
+            long count = lambdaQuery()
+                    .eq(SnBookmark::getUserId, userId)
+                    .eq(SnBookmark::getUrl, url)
+                    .eq(SnBookmark::getDeleted, 0)
+                    .count();
+            result.put(url, count);
+        }
+        return result;
+    }
+
+    /**
+     * 根据匹配等级获取重复书签分组信息
+     *
+     * @param userId 用户ID
+     * @param level  匹配等级 (2-4, 2=1级域名, 3=2级域名, 4=3级域名)
+     * @return 按分组键分组的重复书签统计
+     */
+    /**
+     * 根据匹配等级获取重复分组
+     *
+     * @param userId 用户ID
+     * @param level 匹配等级 (1: 完整URL匹配，2: 二级域名匹配，3: 三级域名匹配)
+     * @return 重复分组映射
+     */
+    public Map<String, Long> getDuplicateGroupsByLevel(String userId, int level) {
+        // 获取用户的所有忽略组
+        List<String> ignoredGroups = ignoredGroupService.getUserIgnoredGroups(userId);
+
+        // 获取所有书签
+        List<SnBookmark> allBookmarks = lambdaQuery()
+                .eq(SnBookmark::getUserId, userId)
+                .eq(SnBookmark::getDeleted, 0)
+                .list();
+
+        // 根据匹配等级分组书签
+        Map<String, List<SnBookmark>> groupedBookmarks = groupBookmarksByLevel(allBookmarks, level);
+
+        // 统计每个分组的数量，过滤掉被忽略的组
+        Map<String, Long> result = new HashMap<>();
+        groupedBookmarks.forEach((key, bookmarks) -> {
+            if (bookmarks.size() > 1 && !ignoredGroups.contains(key)) {
+                result.put(key, (long) bookmarks.size());
+            }
+        });
+
+        return result;
+    }
+
+    /**
+     * 根据匹配等级获取指定分组的书签
+     *
+     * @param groupKey 分组键
+     * @param userId   用户ID
+     * @param level    匹配等级 (2-4, 2=1级域名, 3=2级域名, 4=3级域名)
+     * @return 书签列表
+     */
+    /**
+     * 根据分组键获取书签列表
+     *
+     * @param groupKey 分组键
+     * @param userId 用户ID
+     * @param level 匹配等级 (1: 完整URL匹配，2: 二级域名匹配，3: 三级域名匹配)
+     * @return 书签列表
+     */
+    public List<SnBookmark> getBookmarksByGroupKey(String groupKey, String userId, int level) {
+        // 获取所有书签
+        List<SnBookmark> allBookmarks = lambdaQuery()
+                .eq(SnBookmark::getUserId, userId)
+                .eq(SnBookmark::getDeleted, 0)
+                .list();
+
+        List<SnBookmark> result = new ArrayList<>();
+
+        for (SnBookmark bookmark : allBookmarks) {
+            String url = bookmark.getUrl();
+            if (url == null || url.trim().isEmpty()) {
+                continue;
+            }
+
+            boolean shouldInclude = false;
+
+            switch (level) {
+                case 1:
+                    // Level 1: 完整URL匹配
+                    shouldInclude = groupKey.equals(normalizeUrl(url));
+                    break;
+
+                case 2:
+                    // Level 2: 二级域名匹配
+                    String firstLevelDomain = getFirstLevelDomain(url);
+                    shouldInclude = groupKey.equals(firstLevelDomain);
+                    break;
+
+                case 3:
+                    // Level 3: 三级域名匹配，但分组键仍为二级域名
+                    String secondLevelDomain = getSecondLevelDomain(url);
+                    String firstLevelDomainForLevel3 = getFirstLevelDomain(url);
+                    // 只有当书签的三级域名与groupKey匹配，且分组键为二级域名时才包含
+                    shouldInclude = groupKey.equals(firstLevelDomainForLevel3) && secondLevelDomain != null;
+                    break;
+            }
+
+            if (shouldInclude) {
+                result.add(bookmark);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 根据匹配等级按URL获取重复书签
+     *
+     * @param url    书签URL
+     * @param userId 用户ID
+     * @return 重复书签列表
+     */
+    public List<SnBookmark> getBookmarksByUrl(String url, String userId) {
+        return lambdaQuery()
+                .eq(SnBookmark::getUserId, userId)
+                .eq(SnBookmark::getUrl, url)
+                .eq(SnBookmark::getDeleted, 0)
+                .orderByDesc(SnBookmark::getUpdateTime)
+                .list();
+    }
+
+    /**
+     * 根据匹配等级分组书签
+     *
+     * @param bookmarks 书签列表
+     * @param level     匹配等级 (2-4, 2=1级域名, 3=2级域名, 4=3级域名)
+     * @return 按分组键分组的书签映射
+     */
+    private Map<String, List<SnBookmark>> groupBookmarksByLevel(List<SnBookmark> bookmarks, int level) {
+        Map<String, List<SnBookmark>> result = new HashMap<>();
+
+        for (SnBookmark bookmark : bookmarks) {
+            String url = bookmark.getUrl();
+            if (url == null || url.trim().isEmpty()) {
+                continue;
+            }
+
+            String groupKey = getGroupKeyByUrl(url, level);
+            if (groupKey != null) {
+                result.computeIfAbsent(groupKey, k -> new ArrayList<>()).add(bookmark);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 根据URL和匹配等级获取分组键
+     *
+     * @param url   书签URL
+     * @param level 匹配等级 (1-3)
+     * @return 分组键，对于域名匹配始终返回二级域名
+     */
+    private String getGroupKeyByUrl(String url, int level) {
+        try {
+            switch (level) {
+                case 1:
+                    // Level 1: 完整URL匹配
+                    return normalizeUrl(url);
+
+                case 2:
+                case 3:
+                    // Level 2&3: 都使用二级域名作为分组键 (例如 google.com)
+                    return getFirstLevelDomain(url);
+
+                default:
+                    // 默认使用完整URL匹配
+                    return normalizeUrl(url);
+            }
+        } catch (Exception e) {
+            // URL解析失败时返回null，跳过该书签
+            return null;
+        }
+    }
+
+    /**
+     * 标准化URL
+     *
+     * @param url 原始URL
+     * @return 标准化后的URL
+     */
+    private String normalizeUrl(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return "";
+        }
+
+        String normalized = url.trim().toLowerCase();
+
+        // 移除协议
+        if (normalized.startsWith("http://")) {
+            normalized = normalized.substring(7);
+        } else if (normalized.startsWith("https://")) {
+            normalized = normalized.substring(8);
+        }
+
+        // 移除www.前缀
+        if (normalized.startsWith("www.")) {
+            normalized = normalized.substring(4);
+        }
+
+        // 移除端口号
+        int portIndex = normalized.indexOf(':');
+        if (portIndex > 0) {
+            int pathIndex = normalized.indexOf('/');
+            if (pathIndex == -1 || portIndex < pathIndex) {
+                normalized = normalized.substring(0, portIndex) + normalized.substring(pathIndex);
+            }
+        }
+
+        // 移除路径结尾的斜杠
+        normalized = normalized.endsWith("/") ? normalized.substring(0, normalized.length() - 1) : normalized;
+
+        return normalized;
+    }
+
+    /**
+     * 获取1级域名 (example.com) - 现在作为Level 2
+     *
+     * @param url 原始URL
+     * @return 1级域名
+     */
+    private String getFirstLevelDomain(String url) {
+        // 标准化URL处理
+        String normalizedUrl = normalizeUrl(url);
+        // 移除路径部分
+        String domain = extractDomainPart(normalizedUrl);
+        if (domain == null) return null;
+
+        // 分割域名部分
+        String[] parts = domain.split("\\.");
+        if (parts.length < 2) return domain;
+
+        // 获取最后两部分作为1级域名
+        return parts[parts.length - 2] + "." + parts[parts.length - 1];
+    }
+
+    /**
+     * 获取2级域名 (sub.example.com) - 现在作为Level 3
+     *
+     * @param url 原始URL
+     * @return 2级域名
+     */
+    private String getSecondLevelDomain(String url) {
+        // 标准化URL处理
+        String normalizedUrl = normalizeUrl(url);
+        // 移除路径部分
+        String domain = extractDomainPart(normalizedUrl);
+        if (domain == null) return null;
+
+        // 分割域名部分
+        String[] parts = domain.split("\\.");
+        if (parts.length < 2) return domain;
+
+        // 特殊处理：处理数字前缀的情况（如 1.www.google.com -> www.google.com）
+        // 如果第一个部分是数字，则跳过它
+        int startIndex = 0;
+        if (parts.length > 2 && isNumeric(parts[0])) {
+            startIndex = 1;
+        }
+
+        // 计算有效的域名部分数量
+        int effectiveLength = parts.length - startIndex;
+
+        if (effectiveLength >= 3) {
+            // 有足够的部分构成2级域名
+            return parts[parts.length - 3] + "." + parts[parts.length - 2] + "." + parts[parts.length - 1];
+        } else if (effectiveLength == 2) {
+            // 只有主域名，返回1级域名
+            return parts[parts.length - 2] + "." + parts[parts.length - 1];
+        } else {
+            // 只有单个部分，返回整个域名
+            return domain;
+        }
+    }
+
+    /**
+     * 获取3级域名 (sub.sub.example.com) - 现在作为Level 4
+     *
+     * @param url 原始URL
+     * @return 3级域名
+     */
+    private String getThirdLevelDomain(String url) {
+        // 标准化URL处理
+        String normalizedUrl = normalizeUrl(url);
+        // 移除路径部分
+        String domain = extractDomainPart(normalizedUrl);
+        if (domain == null) return null;
+
+        // 分割域名部分
+        String[] parts = domain.split("\\.");
+        if (parts.length < 2) return domain;
+
+        // 特殊处理：处理数字前缀的情况（如 1.www.google.com -> www.google.com）
+        // 如果第一个部分是数字，则跳过它
+        int startIndex = 0;
+        if (parts.length > 2 && isNumeric(parts[0])) {
+            startIndex = 1;
+        }
+
+        // 计算有效的域名部分数量
+        int effectiveLength = parts.length - startIndex;
+
+        if (effectiveLength >= 4) {
+            // 有足够的部分构成3级域名
+            return parts[parts.length - 4] + "." + parts[parts.length - 3] + "." +
+                   parts[parts.length - 2] + "." + parts[parts.length - 1];
+        } else if (effectiveLength == 3) {
+            // 只有2级域名，返回2级域名
+            return parts[parts.length - 3] + "." + parts[parts.length - 2] + "." + parts[parts.length - 1];
+        } else if (effectiveLength == 2) {
+            // 只有主域名，返回1级域名
+            return parts[parts.length - 2] + "." + parts[parts.length - 1];
+        } else {
+            // 只有单个部分，返回整个域名
+            return domain;
+        }
+    }
+
+    /**
+     * 检查字符串是否为数字
+     *
+     * @param str 字符串
+     * @return 是否为数字
+     */
+    private boolean isNumeric(String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+        try {
+            Integer.parseInt(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 从标准化URL中提取域名部分
+     *
+     * @param normalizedUrl 标准化URL
+     * @return 域名部分
+     */
+    private String extractDomainPart(String normalizedUrl) {
+        if (normalizedUrl == null || normalizedUrl.trim().isEmpty()) {
+            return null;
+        }
+
+        // 查找第一个斜杠，分离域名和路径
+        int slashIndex = normalizedUrl.indexOf('/');
+        if (slashIndex > 0) {
+            return normalizedUrl.substring(0, slashIndex);
+        }
+
+        return normalizedUrl;
+    }
+
+    /**
+     * 检查URL是否重复
+     *
+     * @param url    要检查的URL
+     * @param level  匹配级别 (1: 完整URL匹配，2: 二级域名匹配，3: 三级域名匹配)
+     * @param userId 用户ID
+     * @return 检查重复响应
+     */
+    public CheckDuplicateResp checkDuplicate(String url, int level, String userId) {
+        // 获取用户的所有忽略组
+        List<String> ignoredGroups = ignoredGroupService.getUserIgnoredGroups(userId);
+
+        // 获取用户的所有书签
+        List<SnBookmark> userBookmarks = lambdaQuery()
+                .eq(SnBookmark::getUserId, userId)
+                .eq(SnBookmark::getDeleted, 0)
+                .list();
+
+        CheckDuplicateResp response = new CheckDuplicateResp();
+        response.setDuplicate(false);
+
+        // 根据匹配级别检查重复
+        switch (level) {
+            case 1:
+                // Level 1: 完整URL匹配
+                response = checkCompleteUrlMatch(url, userBookmarks, ignoredGroups);
+                break;
+            case 2:
+                // Level 2: 二级域名匹配
+                response = checkSecondLevelDomainMatch(url, userBookmarks, ignoredGroups);
+                break;
+            case 3:
+                // Level 3: 三级域名匹配
+                response = checkThirdLevelDomainMatch(url, userBookmarks, ignoredGroups);
+                break;
+            default:
+                // 默认使用完整URL匹配
+                response = checkCompleteUrlMatch(url, userBookmarks, ignoredGroups);
+        }
+
+        return response;
+    }
+
+    /**
+     * 检查完整URL匹配
+     *
+     * @param url            要检查的URL
+     * @param userBookmarks  用户书签列表
+     * @param ignoredGroups  忽略组列表
+     * @return 检查重复响应
+     */
+    private CheckDuplicateResp checkCompleteUrlMatch(String url, List<SnBookmark> userBookmarks, List<String> ignoredGroups) {
+        CheckDuplicateResp response = new CheckDuplicateResp();
+        response.setDuplicate(false);
+
+        String normalizedInputUrl = normalizeUrl(url);
+
+        // 检查是否在忽略组中
+        if (ignoredGroups.contains(normalizedInputUrl)) {
+            return response;
+        }
+
+        // 查找匹配的书签
+        List<SnBookmark> matchingBookmarks = userBookmarks.stream()
+                .filter(bookmark -> {
+                    String bookmarkUrl = bookmark.getUrl();
+                    if (bookmarkUrl == null || bookmarkUrl.trim().isEmpty()) {
+                        return false;
+                    }
+                    return normalizedInputUrl.equals(normalizeUrl(bookmarkUrl));
+                })
+                .toList();
+
+        if (!matchingBookmarks.isEmpty()) {
+            response.setDuplicate(true);
+            response.setMatchKey(normalizedInputUrl);
+            response.setCount(matchingBookmarks.size());
+        }
+
+        return response;
+    }
+
+    /**
+     * 检查二级域名匹配
+     *
+     * @param url            要检查的URL
+     * @param userBookmarks  用户书签列表
+     * @param ignoredGroups  忽略组列表
+     * @return 检查重复响应
+     */
+    private CheckDuplicateResp checkSecondLevelDomainMatch(String url, List<SnBookmark> userBookmarks, List<String> ignoredGroups) {
+        CheckDuplicateResp response = new CheckDuplicateResp();
+        response.setDuplicate(false);
+
+        String inputDomain = getFirstLevelDomain(url);
+        if (inputDomain == null) {
+            return response;
+        }
+
+        // 检查是否在忽略组中
+        if (ignoredGroups.contains(inputDomain)) {
+            return response;
+        }
+
+        // 查找匹配的书签
+        List<SnBookmark> matchingBookmarks = userBookmarks.stream()
+                .filter(bookmark -> {
+                    String bookmarkUrl = bookmark.getUrl();
+                    if (bookmarkUrl == null || bookmarkUrl.trim().isEmpty()) {
+                        return false;
+                    }
+                    String bookmarkDomain = getFirstLevelDomain(bookmarkUrl);
+                    return inputDomain.equals(bookmarkDomain);
+                })
+                .toList();
+
+        if (!matchingBookmarks.isEmpty()) {
+            response.setDuplicate(true);
+            response.setMatchKey(inputDomain);
+            response.setCount(matchingBookmarks.size());
+        }
+
+        return response;
+    }
+
+    /**
+     * 检查三级域名匹配
+     *
+     * @param url            要检查的URL
+     * @param userBookmarks  用户书签列表
+     * @param ignoredGroups  忽略组列表
+     * @return 检查重复响应
+     */
+    private CheckDuplicateResp checkThirdLevelDomainMatch(String url, List<SnBookmark> userBookmarks, List<String> ignoredGroups) {
+        CheckDuplicateResp response = new CheckDuplicateResp();
+        response.setDuplicate(false);
+
+        String inputSecondLevelDomain = getSecondLevelDomain(url);
+        String inputFirstLevelDomain = getFirstLevelDomain(url);
+
+        if (inputSecondLevelDomain == null || inputFirstLevelDomain == null) {
+            return response;
+        }
+
+        // 检查是否在忽略组中（使用二级域名作为分组键）
+        if (ignoredGroups.contains(inputFirstLevelDomain)) {
+            return response;
+        }
+
+        // 查找匹配的书签
+        List<SnBookmark> matchingBookmarks = userBookmarks.stream()
+                .filter(bookmark -> {
+                    String bookmarkUrl = bookmark.getUrl();
+                    if (bookmarkUrl == null || bookmarkUrl.trim().isEmpty()) {
+                        return false;
+                    }
+                    String bookmarkSecondLevelDomain = getSecondLevelDomain(bookmarkUrl);
+                    return inputSecondLevelDomain.equals(bookmarkSecondLevelDomain);
+                })
+                .toList();
+
+        if (!matchingBookmarks.isEmpty()) {
+            response.setDuplicate(true);
+            response.setMatchKey(inputSecondLevelDomain);
+            response.setCount(matchingBookmarks.size());
+        }
+
+        return response;
     }
 
 }

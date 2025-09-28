@@ -15,9 +15,15 @@ import pres.peixinyi.sinan.common.Result;
 import pres.peixinyi.sinan.dto.request.AddBookmarkReq;
 import pres.peixinyi.sinan.dto.request.EditBookmarkReq;
 import pres.peixinyi.sinan.dto.response.BookmarkResp;
+import pres.peixinyi.sinan.dto.response.DuplicateBookmarksResp;
 import pres.peixinyi.sinan.dto.response.ImportBookmarkResp;
+import pres.peixinyi.sinan.dto.response.SpaceResp;
+import pres.peixinyi.sinan.dto.response.TagResp;
+import pres.peixinyi.sinan.dto.request.CheckDuplicateReq;
+import pres.peixinyi.sinan.dto.response.CheckDuplicateResp;
 import pres.peixinyi.sinan.model.sinan.entity.SnBookmark;
 import pres.peixinyi.sinan.model.sinan.entity.SnBookmarkAssTag;
+import pres.peixinyi.sinan.model.sinan.entity.SnSpace;
 import pres.peixinyi.sinan.model.sinan.entity.SnTag;
 import pres.peixinyi.sinan.model.sinan.service.*;
 import pres.peixinyi.sinan.config.UploadProperties;
@@ -30,8 +36,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 书签控制层
@@ -497,6 +505,139 @@ public class BookmarkController {
         return Result.success(starredBookmarks.stream()
                 .map(BookmarkResp::from)
                 .toList());
+    }
+
+    /**
+     * 获取重复书签
+     *
+     * @param level 1: 完整URL匹配，2: 二级域名匹配，3: 三级域名匹配
+     * @return 重复书签信息
+     */
+    @GetMapping("/duplicates")
+    public Result<DuplicateBookmarksResp> getDuplicateBookmarks(@RequestParam(value = "level",defaultValue = "1") int level) {
+        String currentUserId = StpUtil.getLoginIdAsString();
+
+        // 验证level参数范围
+        if (level < 1 || level > 3) {
+            return Result.fail("level参数必须在1-3之间");
+        }
+
+        // 获取重复分组信息（基于level）
+        Map<String, Long> duplicateGroupsByLevel = bookmarkService.getDuplicateGroupsByLevel(currentUserId, level);
+
+        // 获取总书签数
+        long totalBookmarks = bookmarkService.lambdaQuery()
+                .eq(SnBookmark::getUserId, currentUserId)
+                .eq(SnBookmark::getDeleted, 0)
+                .count();
+
+        // 获取所有重复书签
+        List<SnBookmark> duplicateBookmarks = bookmarkService.getDuplicateBookmarks(currentUserId, level);
+
+        // 获取所有相关的空间ID
+        List<String> spaceIds = duplicateBookmarks.stream()
+                .map(SnBookmark::getSpaceId)
+                .filter(spaceId -> spaceId != null && !spaceId.isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 获取空间信息映射
+        Map<String, SnSpace> spaceMap = new HashMap<>();
+        if (!spaceIds.isEmpty()) {
+            List<SnSpace> spaces = spaceService.getSpacesByIds(spaceIds);
+            spaceMap = spaces.stream()
+                    .collect(Collectors.toMap(SnSpace::getId, space -> space));
+        }
+
+        // 构建重复组信息
+        List<DuplicateBookmarksResp.DuplicateGroupResp> duplicateGroups = new ArrayList<>();
+
+        for (Map.Entry<String, Long> entry : duplicateGroupsByLevel.entrySet()) {
+            String groupKey = entry.getKey();
+
+            // 获取该分组键的所有书签
+            List<SnBookmark> groupBookmarks = bookmarkService.getBookmarksByGroupKey(groupKey, currentUserId, level);
+
+            // 获取书签ID列表
+            List<String> bookmarkIds = groupBookmarks.stream()
+                    .map(SnBookmark::getId)
+                    .toList();
+
+            // 批量获取标签信息
+            Map<String, List<SnTag>> bookmarkTagsMap = bookmarkService.getBatchBookmarkTags(bookmarkIds);
+
+            // 构建书签列表
+            List<DuplicateBookmarksResp.DuplicateBookmarkResp> bookmarks = new ArrayList<>();
+            for (SnBookmark bookmark : groupBookmarks) {
+                List<SnTag> tags = bookmarkTagsMap.getOrDefault(bookmark.getId(), List.of());
+                DuplicateBookmarksResp.DuplicateBookmarkResp bookmarkInfo = new DuplicateBookmarksResp.DuplicateBookmarkResp();
+                bookmarkInfo.setId(bookmark.getId());
+                bookmarkInfo.setName(bookmark.getName());
+                bookmarkInfo.setUrl(bookmark.getUrl());
+                bookmarkInfo.setIcon(bookmark.getIcon());
+
+                // 设置空间信息
+                String spaceId = bookmark.getSpaceId();
+                if (spaceId != null && !spaceId.isEmpty()) {
+                    SnSpace space = spaceMap.get(spaceId);
+                    bookmarkInfo.setSpace(space != null ? SpaceResp.from(space) : null);
+                } else {
+                    bookmarkInfo.setSpace(null);
+                }
+
+                // 设置标签信息
+                bookmarkInfo.setTags(tags.stream()
+                        .map(TagResp::from)
+                        .collect(Collectors.toList()));
+
+                bookmarkInfo.setCreateTime(bookmark.getCreateTime().toString());
+                bookmarks.add(bookmarkInfo);
+            }
+
+            // 构建重复组信息
+            DuplicateBookmarksResp.DuplicateGroupResp duplicateGroup = new DuplicateBookmarksResp.DuplicateGroupResp();
+            duplicateGroup.setGroup(groupKey);
+            duplicateGroup.setBookmarks(bookmarks);
+
+            duplicateGroups.add(duplicateGroup);
+        }
+
+        // 构建统计信息
+        DuplicateBookmarksResp.StatsResp stats = new DuplicateBookmarksResp.StatsResp();
+        stats.setTotalBookmarks(totalBookmarks);
+        stats.setDuplicateGroups(duplicateGroupsByLevel.size());
+        stats.setDuplicateCount(duplicateGroupsByLevel.values().stream().mapToLong(Long::longValue).sum());
+
+        // 构建响应数据
+        DuplicateBookmarksResp response = new DuplicateBookmarksResp();
+        response.setDuplicates(duplicateGroups);
+        response.setStats(stats);
+
+        return Result.success(response);
+    }
+
+    /**
+     * 检查URL是否重复
+     *
+     * @param req 检查重复请求
+     * @return 检查重复响应
+     */
+    @PostMapping("/check-duplicate")
+    public Result<CheckDuplicateResp> checkDuplicate(@RequestBody CheckDuplicateReq req) {
+        String currentUserId = StpUtil.getLoginIdAsString();
+
+        // 参数校验
+        if (req.getUrl() == null || req.getUrl().trim().isEmpty()) {
+            return Result.fail("URL不能为空");
+        }
+
+        if (req.getLevel() < 1 || req.getLevel() > 3) {
+            return Result.fail("匹配级别必须在1-3之间");
+        }
+
+        // 调用服务层检查重复
+        CheckDuplicateResp result = bookmarkService.checkDuplicate(req.getUrl(), req.getLevel(), currentUserId);
+        return Result.success(result);
     }
 
     /**
