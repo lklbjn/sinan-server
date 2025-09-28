@@ -35,6 +35,11 @@ public class BookmarkTreeResp {
     private String key;
 
     /**
+     * child
+     */
+    private List<BookmarkTreeResp> children;
+
+    /**
      * 空间下的书签列表
      */
     private List<BookmarkResp> bookmarks;
