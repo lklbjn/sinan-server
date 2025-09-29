@@ -205,4 +205,21 @@ public class SnUserCredentialService extends ServiceImpl<SnUserCredentialMapper,
                 .eq(SnUserCredential::getCredential, email)
                 .oneOpt().map(SnUserCredential::getUserId).orElseThrow(() -> new UserRuntionException("用户不存在"));
     }
+
+    /**
+     * 更新用户名
+     *
+     * @param userId      用户ID
+     * @param newUsername 新用户名
+     * @return 更新是否成功
+     */
+    public boolean updateUsername(String userId, String newUsername) {
+        return lambdaUpdate()
+                .eq(SnUserCredential::getUserId, userId)
+                .eq(SnUserCredential::getCredentialType, CredentialType.USERNAME)
+                .eq(SnUserCredential::getDeleted, 0)
+                .set(SnUserCredential::getCredential, newUsername)
+                .set(SnUserCredential::getUpdateTime, new Date())
+                .update();
+    }
 }

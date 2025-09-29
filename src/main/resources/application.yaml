@@ -39,8 +39,10 @@ sinan:
     base-path: ${UPLOAD_BASE_PATH:./upload}
     # 图标上传路径
     icon-path: ${UPLOAD_ICON_PATH:icons}
+    # 头像上传路径
+    avatar-path: ${UPLOAD_AVATAR_PATH:avatars}
     # 访问URL前缀
-    url-prefix: ${UPLOAD_URL_PREFIX:/api/bookmark}
+    url-prefix: ${UPLOAD_URL_PREFIX:/api/user}
 favicon:
   cache:
     # favicon缓存目录

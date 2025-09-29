@@ -233,4 +233,53 @@ public class SnUserService extends ServiceImpl<SnUserMapper, SnUser> {
                 .last("limit 1")
                 .one();
     }
+
+    /**
+     * 更新用户头像URL
+     *
+     * @param userId    用户ID
+     * @param avatarUrl 头像URL
+     * @return 更新是否成功
+     */
+    public boolean updateUserAvatar(String userId, String avatarUrl) {
+        return lambdaUpdate()
+                .eq(SnUser::getId, userId)
+                .set(SnUser::getAvatar, avatarUrl)
+                .update();
+    }
+
+    /**
+     * 修改用户名
+     *
+     * @param userId      用户ID
+     * @param newUsername 新用户名
+     * @return 修改是否成功
+     */
+    public boolean changeUsername(String userId, String newUsername) {
+        // 检查新用户名是否已存在
+        if (snUserCredentialService.checkCredentialExists(USERNAME, newUsername)) {
+            throw new UserCredentialException("用户名已存在");
+        }
+
+        // 获取当前用户名
+        String currentUsername = snUserCredentialService.getUsernameByUserId(userId);
+        if (currentUsername != null && currentUsername.equals(newUsername)) {
+            throw new UserCredentialException("新用户名不能与当前用户名相同");
+        }
+
+        // 更新用户名凭证
+        boolean credentialUpdated = snUserCredentialService.updateUsername(userId, newUsername);
+
+        if (credentialUpdated) {
+            // 同时更新用户表中的name字段
+            return lambdaUpdate()
+                    .eq(SnUser::getId, userId)
+                    .eq(SnUser::getDeleted, 0)
+                    .set(SnUser::getName, newUsername)
+                    .set(SnUser::getUpdateTime, new Date())
+                    .update();
+        }
+
+        return false;
+    }
 }

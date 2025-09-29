@@ -6,12 +6,22 @@ import com.yubico.webauthn.exception.AssertionFailedException;
 import com.yubico.webauthn.exception.RegistrationFailedException;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
+import net.coobird.thumbnailator.Thumbnails;
+import pres.peixinyi.sinan.config.UploadProperties;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import pres.peixinyi.sinan.common.Result;
 import pres.peixinyi.sinan.dto.request.*;
 import pres.peixinyi.sinan.dto.response.*;
@@ -55,6 +65,12 @@ public class UserController {
 
     @Resource
     private PasskeyAuthorizationService passkeyAuthorizationService;
+
+    @Resource
+    private UploadProperties uploadProperties;
+
+    @Value("${sinan.server.base-url}")
+    private String baseUrl;
 
     /**
      * 用户注册
@@ -131,19 +147,6 @@ public class UserController {
         } catch (Exception e) {
             return Result.fail("登出失败: " + e.getMessage());
         }
-    }
-
-    /**
-     * 旧的登录接口（保持兼容）
-     *
-     * @return void
-     * @author peixinyi
-     * @since 21:38 2025/8/12
-     */
-    @PostMapping("/doLogin")
-    public Result<SaTokenInfo> doLogin() {
-        StpUtil.login("admin");
-        return Result.ok(StpUtil.getTokenInfo());
     }
 
     /**
@@ -364,6 +367,33 @@ public class UserController {
 
         } catch (Exception e) {
             return Result.fail("获取密码状态失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 修改用户名
+     *
+     * @param req 修改用户名请求
+     * @return 修改结果
+     */
+    @PostMapping("/change-username")
+    public Result<String> changeUsername(@Valid @RequestBody ChangeUsernameReq req) {
+        String currentUserId = StpUtil.getLoginIdAsString();
+
+        try {
+            // 执行用户名修改
+            boolean success = userService.changeUsername(currentUserId, req.getNewUsername());
+
+            if (success) {
+                return Result.success("用户名修改成功");
+            } else {
+                return Result.fail("用户名修改失败");
+            }
+
+        } catch (RuntimeException e) {
+            return Result.fail(e.getMessage());
+        } catch (Exception e) {
+            return Result.fail("用户名修改失败: " + e.getMessage());
         }
     }
 
@@ -599,6 +629,155 @@ public class UserController {
             return Result.ok();
         } catch (Exception e) {
             return Result.fail("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 上传用户头像
+     *
+     * @param file 上传的头像文件
+     * @return 上传结果，包含头像的访问路径
+     */
+    @PostMapping("/upload/avatar")
+    public Result<String> uploadAvatar(@RequestParam("file") MultipartFile file) {
+        String currentUserId = StpUtil.getLoginIdAsString();
+
+        // 参数校验
+        if (file == null || file.isEmpty()) {
+            return Result.fail("请选择要上传的头像");
+        }
+
+        // 检查文件类型
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null) {
+            return Result.fail("文件名不能为空");
+        }
+
+        String lowerCaseFilename = originalFilename.toLowerCase();
+        if (!lowerCaseFilename.endsWith(".jpg") && !lowerCaseFilename.endsWith(".jpeg")
+                && !lowerCaseFilename.endsWith(".png") && !lowerCaseFilename.endsWith(".gif")
+                && !lowerCaseFilename.endsWith(".bmp") && !lowerCaseFilename.endsWith(".webp")) {
+            return Result.fail("只支持 JPG、PNG、GIF、BMP、WEBP 格式的图片");
+        }
+
+        // 检查文件大小（限制为5MB）
+        if (file.getSize() > 5 * 1024 * 1024) {
+            return Result.fail("头像大小不能超过5MB");
+        }
+
+        try {
+            // 读取图片
+            BufferedImage srcImg = ImageIO.read(file.getInputStream());
+            if (srcImg == null) {
+                return Result.fail("图片格式不正确或已损坏");
+            }
+
+            // 获取图片的宽高
+            int width = srcImg.getWidth();
+            int height = srcImg.getHeight();
+
+            // 计算裁剪区域（取中心正方形区域）
+            int size = Math.min(width, height);
+            int x = (width - size) / 2;
+            int y = (height - size) / 2;
+
+            // 裁剪为正方形
+            BufferedImage squareImg = srcImg.getSubimage(x, y, size, size);
+
+            // 压缩为256x256并转换为PNG格式
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            Thumbnails.of(squareImg)
+                    .size(256, 256)
+                    .outputFormat("png")
+                    .outputQuality(0.8)
+                    .toOutputStream(out);
+
+            // 生成文件名（使用用户ID前缀避免冲突）
+            String fileName = "avatar_" + currentUserId + "_" + System.currentTimeMillis() + ".png";
+
+            // 使用配置的上传路径
+            Path uploadDir = Paths.get(uploadProperties.getAvatarUploadPath());
+            Files.createDirectories(uploadDir);
+
+            Path savePath = uploadDir.resolve(fileName);
+            Files.write(savePath, out.toByteArray());
+
+            // 更新用户头像URL
+            String avatarUrl = uploadProperties.getAvatarFullUrl(baseUrl, fileName);
+            boolean updated = userService.updateUserAvatar(currentUserId, avatarUrl);
+
+            if (!updated) {
+                return Result.fail("头像上传成功但更新用户信息失败");
+            }
+
+            return Result.success(avatarUrl);
+
+        } catch (Exception e) {
+            return Result.fail("头像处理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 读取用户头像
+     *
+     * @param fileName 头像文件名
+     * @return 头像文件的字节流
+     */
+    @GetMapping("/avatars/{fileName}")
+    public ResponseEntity<byte[]> getAvatar(@PathVariable("fileName") String fileName) {
+        try {
+            // 参数校验
+            if (fileName == null || fileName.isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // 安全检查：防止路径遍历攻击
+            if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // 检查文件扩展名
+            if (!fileName.toLowerCase().endsWith(".png") && !fileName.toLowerCase().endsWith(".jpg")
+                && !fileName.toLowerCase().endsWith(".jpeg") && !fileName.toLowerCase().endsWith(".gif")
+                && !fileName.toLowerCase().endsWith(".bmp") && !fileName.toLowerCase().endsWith(".webp")) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // 构建文件路径
+            Path filePath = Paths.get(uploadProperties.getAvatarUploadPath()).resolve(fileName);
+
+            // 检查文件是否存在
+            if (!Files.exists(filePath)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // 读取文件内容
+            byte[] fileContent = Files.readAllBytes(filePath);
+
+            // 根据文件扩展名设置正确的Content-Type
+            String contentType = "image/png";
+            if (fileName.toLowerCase().endsWith(".jpg") || fileName.toLowerCase().endsWith(".jpeg")) {
+                contentType = "image/jpeg";
+            } else if (fileName.toLowerCase().endsWith(".gif")) {
+                contentType = "image/gif";
+            } else if (fileName.toLowerCase().endsWith(".bmp")) {
+                contentType = "image/bmp";
+            } else if (fileName.toLowerCase().endsWith(".webp")) {
+                contentType = "image/webp";
+            }
+
+            // 设置响应头
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.valueOf(contentType));
+            headers.setContentLength(fileContent.length);
+            headers.setCacheControl("public, max-age=31536000"); // 缓存一年
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(fileContent);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
         }
     }
 }
