@@ -222,4 +222,5 @@ public class SnUserCredentialService extends ServiceImpl<SnUserCredentialMapper,
                 .set(SnUserCredential::getUpdateTime, new Date())
                 .update();
     }
+
 }

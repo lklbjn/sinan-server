@@ -12,7 +12,8 @@ public enum CredentialType {
     EMAIL,
     USERNAME,
     GITHUB,
-    PASSKEY, PASSWORD;
+    PASSKEY,
+    PASSWORD;
 
     public static CredentialType from(String type) {
         for (CredentialType value : values()) {

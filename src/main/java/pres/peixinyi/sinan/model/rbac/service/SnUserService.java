@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Date;
+import java.util.UUID;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +14,8 @@ import pres.peixinyi.sinan.model.rbac.domain.CredentialType;
 import pres.peixinyi.sinan.model.rbac.entity.SnUser;
 import pres.peixinyi.sinan.model.rbac.mapper.SnUserMapper;
 import pres.peixinyi.sinan.exception.UserCredentialException;
+import pres.peixinyi.sinan.service.EmailService;
+import pres.peixinyi.sinan.service.PasswordResetService;
 
 import static pres.peixinyi.sinan.model.rbac.domain.CredentialType.EMAIL;
 import static pres.peixinyi.sinan.model.rbac.domain.CredentialType.USERNAME;
@@ -21,10 +24,14 @@ import static pres.peixinyi.sinan.model.rbac.domain.CredentialType.USERNAME;
 public class SnUserService extends ServiceImpl<SnUserMapper, SnUser> {
 
     private final SnUserCredentialService snUserCredentialService;
+    private final EmailService emailService;
+    private final PasswordResetService passwordResetService;
 
     @Autowired
-    public SnUserService(SnUserCredentialService snUserCredentialService) {
+    public SnUserService(SnUserCredentialService snUserCredentialService, EmailService emailService, PasswordResetService passwordResetService) {
         this.snUserCredentialService = snUserCredentialService;
+        this.emailService = emailService;
+        this.passwordResetService = passwordResetService;
     }
 
     /**
@@ -281,5 +288,67 @@ public class SnUserService extends ServiceImpl<SnUserMapper, SnUser> {
         }
 
         return false;
+    }
+
+    /**
+     * 请求密码重置
+     *
+     * @param email 用户邮箱
+     * @return 是否成功发送重置邮件
+     */
+    public boolean requestPasswordReset(String email) {
+        // 查找用户
+        String userId = snUserCredentialService.getUserIdByCredential(EMAIL, email);
+        if (userId == null) {
+            throw new UserCredentialException("邮箱不存在");
+        }
+
+        // 生成重置验证码（32位UUID）
+        String resetCode = UUID.randomUUID().toString().replace("-", "");
+
+        try {
+            // 将重置验证码保存到Redis，设置15分钟过期时间
+            passwordResetService.createPasswordResetCode(userId, resetCode, 15);
+
+            // 发送重置邮件
+            emailService.sendPasswordResetEmail(email, resetCode);
+
+            return true;
+        } catch (Exception e) {
+            throw new UserCredentialException("发送重置邮件失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 重置密码
+     *
+     * @param code        重置验证码
+     * @param newPassword 新密码
+     * @return 是否重置成功
+     */
+    public boolean resetPassword(String code, String newPassword) {
+        // 验证重置验证码
+        String userId = passwordResetService.validatePasswordResetCode(code);
+        if (userId == null) {
+            throw new UserCredentialException("验证码无效或已过期");
+        }
+
+        try {
+            // 加密新密码
+            String hashedPassword = encodePassword(newPassword, userId);
+
+            // 更新密码
+            boolean success = snUserCredentialService.updatePasswordSecret(userId, hashedPassword);
+
+            if (success) {
+                // 删除重置验证码
+                passwordResetService.deletePasswordResetCode(code);
+                return true;
+            }
+
+            return false;
+        } catch (Exception e) {
+            throw new UserCredentialException("重置密码失败: " + e.getMessage());
+        }
     }
 }

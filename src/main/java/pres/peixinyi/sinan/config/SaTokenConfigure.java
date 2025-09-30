@@ -31,6 +31,8 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                         "/user/doLogin",
                         "/user/register",
                         "/user/avatars/{fileName}",
+                        "/user/forgot-password",
+                        "/user/reset-password",
                         "/user/github/oauth2/*",
                         "/actuator/health",
                         "/favicon/icon",

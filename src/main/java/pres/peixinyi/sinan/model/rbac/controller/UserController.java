@@ -398,6 +398,60 @@ public class UserController {
     }
 
     /**
+     * 忘记密码 - 发送重置邮件
+     *
+     * @param req 忘记密码请求
+     * @return 发送结果
+     */
+    @PostMapping("/forgot-password")
+    public Result<String> forgotPassword(@Valid @RequestBody ForgotPasswordReq req) {
+        try {
+            boolean success = userService.requestPasswordReset(req.getEmail());
+
+            if (success) {
+                return Result.success("重置邮件已发送，请检查您的邮箱");
+            } else {
+                return Result.fail("发送重置邮件失败");
+            }
+
+        } catch (RuntimeException e) {
+            return Result.fail(e.getMessage());
+        } catch (Exception e) {
+            return Result.fail("发送重置邮件失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 重置密码
+     *
+     * @param req 重置密码请求
+     * @return 重置结果
+     */
+    @PostMapping("/reset-password")
+    public Result<String> resetPassword(@Valid @RequestBody ResetPasswordReq req) {
+        try {
+            // 验证新密码和确认密码是否一致
+            if (!req.getNewPassword().equals(req.getConfirmPassword())) {
+                return Result.fail("新密码与确认密码不一致");
+            }
+
+            // 执行密码重置
+            boolean success = userService.resetPassword(req.getCode(), req.getNewPassword());
+
+            if (success) {
+                return Result.success("密码重置成功");
+            } else {
+                return Result.fail("密码重置失败");
+            }
+
+        } catch (RuntimeException e) {
+            return Result.fail(e.getMessage());
+        } catch (Exception e) {
+            return Result.fail("密码重置失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 创建用户Key
      *
      * @param req 创建用户Key请求
