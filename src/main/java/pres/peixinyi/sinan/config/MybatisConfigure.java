@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
  * @Version : 0.0.0
  */
 @Configuration
-@MapperScan(value = "pres.peixinyi.sinan.model.*.mapper")
+@MapperScan(value = "pres.peixinyi.sinan.module.*.mapper")
 public class MybatisConfigure {
 
     @Bean

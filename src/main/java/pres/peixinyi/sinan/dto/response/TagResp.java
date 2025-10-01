@@ -1,7 +1,7 @@
 package pres.peixinyi.sinan.dto.response;
 
 import lombok.Data;
-import pres.peixinyi.sinan.model.sinan.entity.SnTag;
+import pres.peixinyi.sinan.module.sinan.entity.SnTag;
 
 import java.util.Date;
 

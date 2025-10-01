@@ -6,7 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import pres.peixinyi.sinan.model.rbac.service.passkey.WebAuthnCredentialRepository;
+import pres.peixinyi.sinan.module.rbac.service.passkey.WebAuthnCredentialRepository;
 
 /**
  * @author lklbjn

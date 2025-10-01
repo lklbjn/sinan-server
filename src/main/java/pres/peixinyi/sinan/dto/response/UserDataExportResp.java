@@ -1,9 +1,9 @@
 package pres.peixinyi.sinan.dto.response;
 
 import lombok.Data;
-import pres.peixinyi.sinan.model.sinan.entity.SnBookmark;
-import pres.peixinyi.sinan.model.sinan.entity.SnSpace;
-import pres.peixinyi.sinan.model.sinan.entity.SnTag;
+import pres.peixinyi.sinan.module.sinan.entity.SnBookmark;
+import pres.peixinyi.sinan.module.sinan.entity.SnSpace;
+import pres.peixinyi.sinan.module.sinan.entity.SnTag;
 
 import java.util.Date;
 import java.util.List;
