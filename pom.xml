@@ -42,6 +42,7 @@
         <mybatis-plus.version>3.5.12</mybatis-plus.version>
         <mysql.version>8.2.0</mysql.version>
         <sa-token.version>1.43.0</sa-token.version>
+        <spring-ai.version>1.0.0-M5</spring-ai.version>
     </properties>
 
     <dependencies>
@@ -135,6 +136,11 @@
             <artifactId>flyway-mysql</artifactId>
             <version>10.19.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -176,5 +182,16 @@
             </plugin>
         </plugins>
     </build>
+
+    <repositories>
+        <repository>
+            <id>spring-milestones</id>
+            <name>Spring Milestones</name>
+            <url>https://repo.spring.io/milestone</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
 
 </project>

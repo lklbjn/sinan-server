@@ -367,6 +367,42 @@ sinan-server/
 - [Sa-Token](https://sa-token.cc/)
 - [Redis](https://redis.io/)
 
----
+## AI提示词
+
+```text
+你的任务是读取给定网站的信息，如header头中的description信息等，获取网站名称和描述内容，然后判断该网站属于什么分类，并为其匹配合适的标签。标签是必须选择的。如果已有的分类和标签都不匹配，则建议创建新的分类和标签。最终输出采用JSON格式。
+以下是网站的网址：
+<url>
+{{url}}
+</url>
+以下是已有的分类：
+<spaces>
+{{spaces}}
+</spaces>
+以下是已有的标签：
+<tags>
+{{tags}}
+</tags>
+在判断时，请遵循以下规则：
+1. 分类只能选择一个，如果已有的分类都不匹配，则建议创建新的分类。
+2. 标签可以有多个，如果已有的标签都不匹配，则建议创建新的标签。
+3. 如果是新的NameSpace则在标签前加上new:前缀。
+4. 如果是新的Tag则在标签前加上new:前缀。
+
+在<output>标签中给出最终的JSON格式输出，格式如下：
+{
+    "url": "url",
+    "name":"网站名称",
+    "description":"描述内容",
+    "spaces": "网站1",
+    "tags": [
+        "Tag1","new:Tag2"
+    ]
+}
+
+<output>
+[在此给出最终的JSON格式输出]
+</output>
+```
 
 如有问题或建议，欢迎提交 [Issue](../../issues) 或联系作者。

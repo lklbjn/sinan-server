@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="pres.peixinyi.sinan.model.sinan.mapper.SnBookmarkAssTagMapper">
-  <resultMap id="BaseResultMap" type="pres.peixinyi.sinan.model.sinan.entity.SnBookmarkAssTag">
+<mapper namespace="pres.peixinyi.sinan.module.sinan.mapper.SnBookmarkAssTagMapper">
+  <resultMap id="BaseResultMap" type="pres.peixinyi.sinan.module.sinan.entity.SnBookmarkAssTag">
     <!--@mbg.generated-->
     <!--@Table sn_bookmark_ass_tag-->
     <id column="id" jdbcType="VARCHAR" property="id" />

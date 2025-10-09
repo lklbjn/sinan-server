@@ -2,7 +2,7 @@ package pres.peixinyi.sinan.dto.response;
 
 import cn.dev33.satoken.stp.SaTokenInfo;
 import lombok.Data;
-import pres.peixinyi.sinan.model.rbac.entity.SnUser;
+import pres.peixinyi.sinan.module.rbac.entity.SnUser;
 
 /**
  * 用户登录响应

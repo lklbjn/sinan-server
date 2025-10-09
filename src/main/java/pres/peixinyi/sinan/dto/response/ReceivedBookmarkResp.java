@@ -1,7 +1,7 @@
 package pres.peixinyi.sinan.dto.response;
 
 import lombok.Data;
-import pres.peixinyi.sinan.model.sinan.entity.SnReceivedBookmark;
+import pres.peixinyi.sinan.module.sinan.entity.SnReceivedBookmark;
 
 import java.util.Date;
 

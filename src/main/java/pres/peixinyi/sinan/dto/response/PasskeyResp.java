@@ -1,7 +1,7 @@
 package pres.peixinyi.sinan.dto.response;
 
 import lombok.Data;
-import pres.peixinyi.sinan.model.rbac.entity.SnPassKey;
+import pres.peixinyi.sinan.module.rbac.entity.SnPassKey;
 
 import java.util.Date;
 
