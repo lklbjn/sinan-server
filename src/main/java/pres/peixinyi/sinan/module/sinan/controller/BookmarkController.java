@@ -134,6 +134,173 @@ public class BookmarkController {
     }
 
     /**
+     * 获取书签列表（支持新的数据格式）
+     *
+     * @return pres.peixinyi.sinan.common.Result<java.util.List<pres.peixinyi.sinan.dto.response.BookmarkResp>>
+     * @author peixinyi
+     * @since 2025/10/9
+     */
+    @GetMapping
+    public Result<List<BookmarkResp>> getBookmarks(@RequestParam(value = "search", required = false) String search,
+                                                   @RequestParam(value = "namespaceId", required = false) String namespaceId,
+                                                   @RequestParam(value = "tags", required = false) String tagsParam) {
+        String currentUserId = StpUtil.getLoginIdAsString();
+
+        // 处理命名空间 - 支持多种方式（类似 addBookmark 方法）
+        String processedNamespaceId = null;
+
+        if (namespaceId != null && !namespaceId.isEmpty()) {
+            // 1. 处理传统的 :new 格式
+            if (namespaceId.contains(":new")) {
+                // 解析命名空间名称
+                String spaceName = namespaceId.replace(":new", "").trim();
+                if (!spaceName.isEmpty()) {
+                    // 检查是否已存在同名空间
+                    if (!spaceService.isSpaceNameExists(currentUserId, spaceName, null)) {
+                        // 创建新空间
+                        SnSpace newSpace = new SnSpace();
+                        newSpace.setUserId(currentUserId);
+                        newSpace.setName(spaceName);
+                        newSpace = spaceService.addSpace(newSpace);
+                        processedNamespaceId = newSpace.getId();
+                    } else {
+                        // 如果空间已存在，查找并使用现有的空间
+                        SnSpace existingSpace = spaceService.lambdaQuery()
+                                .eq(SnSpace::getUserId, currentUserId)
+                                .eq(SnSpace::getName, spaceName)
+                                .eq(SnSpace::getDeleted, 0)
+                                .one();
+                        if (existingSpace != null) {
+                            processedNamespaceId = existingSpace.getId();
+                        }
+                    }
+                } else {
+                    return Result.fail("命名空间名称不能为空");
+                }
+            } else {
+                // 2. 处理普通的 namespaceId
+                processedNamespaceId = namespaceId;
+            }
+        }
+
+        // 处理标签 - 支持多种方式（类似 addBookmark 方法）
+        List<String> processedTagIds = new ArrayList<>();
+
+        if (tagsParam != null && !tagsParam.trim().isEmpty()) {
+            // 解析标签参数，假设格式为逗号分隔的标签列表
+            String[] tagInfos = tagsParam.split(",");
+            for (String tagInfo : tagInfos) {
+                tagInfo = tagInfo.trim();
+                if (tagInfo.contains(":new:#")) {
+                    // 解析标签信息: 格式为 "标签名:new:#颜色代码"
+                    String[] parts = tagInfo.split(":new:#");
+                    if (parts.length == 2) {
+                        String tagName = parts[0].trim();
+                        String tagColor = parts[1].trim();
+
+                        if (!tagName.isEmpty() && !tagColor.isEmpty()) {
+                            // 检查是否已存在同名标签
+                            if (!tagService.isTagNameExists(currentUserId, tagName, null)) {
+                                // 创建新标签
+                                SnTag newTag = new SnTag();
+                                newTag.setUserId(currentUserId);
+                                newTag.setName(tagName);
+                                newTag.setColor(tagColor);
+                                newTag = tagService.addTag(newTag);
+                                processedTagIds.add(newTag.getId());
+                            } else {
+                                // 如果标签已存在，查找并使用现有的标签
+                                SnTag existingTag = tagService.lambdaQuery()
+                                        .eq(SnTag::getUserId, currentUserId)
+                                        .eq(SnTag::getName, tagName)
+                                        .eq(SnTag::getDeleted, 0)
+                                        .one();
+                                if (existingTag != null) {
+                                    processedTagIds.add(existingTag.getId());
+                                }
+                            }
+                        } else {
+                            return Result.fail("标签名称或颜色不能为空");
+                        }
+                    } else {
+                        return Result.fail("标签格式错误，应为: 标签名:new:#颜色代码");
+                    }
+                } else {
+                    // 普通标签ID，直接添加到列表
+                    processedTagIds.add(tagInfo);
+                }
+            }
+        }
+
+        // 获取书签列表
+        List<SnBookmark> bookmarks;
+        if (processedNamespaceId != null && !processedNamespaceId.isEmpty()) {
+            // 如果指定了命名空间，获取该命名空间下的书签
+            if (search != null && !search.trim().isEmpty()) {
+                bookmarks = bookmarkService.searchBookmarksBySpaceId(processedNamespaceId, currentUserId, search.trim());
+            } else {
+                bookmarks = bookmarkService.getBookmarksBySpaceId(processedNamespaceId, currentUserId);
+            }
+        } else {
+            // 获取用户的所有书签
+            if (search != null && !search.trim().isEmpty()) {
+                bookmarks = bookmarkService.searchBookmarks(currentUserId, search.trim());
+            } else {
+                bookmarks = bookmarkService.getAllBookmarks(currentUserId);
+            }
+        }
+
+        // 如果指定了标签，过滤书签列表
+        if (!processedTagIds.isEmpty()) {
+            List<SnBookmark> filteredBookmarks = new ArrayList<>();
+            for (SnBookmark bookmark : bookmarks) {
+                // 获取书签的所有标签
+                List<SnTag> bookmarkTags = bookmarkService.getBookmarkTags(bookmark.getId());
+
+                // 检查书签是否包含指定的任何一个标签
+                boolean hasMatchingTag = bookmarkTags.stream()
+                        .anyMatch(tag -> processedTagIds.contains(tag.getId()));
+
+                if (hasMatchingTag) {
+                    filteredBookmarks.add(bookmark);
+                }
+            }
+            bookmarks = filteredBookmarks;
+        }
+
+        if (bookmarks.isEmpty()) {
+            return Result.success(List.of());
+        }
+
+        // 批量获取书签的标签信息
+        List<String> bookmarkIds = bookmarks.stream()
+                .map(SnBookmark::getId)
+                .toList();
+        Map<String, List<SnTag>> bookmarkTagsMap =
+                bookmarkService.getBatchBookmarkTags(bookmarkIds);
+
+        // 构建响应对象，包含标签信息和订阅状态
+        List<BookmarkResp> bookmarkResponses = bookmarks.stream()
+                .map(bookmark -> {
+                    List<SnTag> tags =
+                            bookmarkTagsMap.getOrDefault(bookmark.getId(), List.of());
+
+                    // 检查订阅状态
+                    Boolean subscribed = false;
+                    String spaceId = bookmark.getSpaceId();
+                    if (spaceId != null && !spaceId.isEmpty()) {
+                        // 如果书签有空间，检查当前用户是否订阅了该空间
+                        subscribed = snShareSpaceAssUserService.isCollection(spaceId, currentUserId);
+                    }
+
+                    return BookmarkResp.from(bookmark, tags, subscribed);
+                })
+                .toList();
+
+        return Result.success(bookmarkResponses);
+    }
+
+    /**
      * 获取最常使用的书签
      *
      * @return pres.peixinyi.sinan.common.Result<java.util.List<pres.peixinyi.sinan.dto.response.BookmarkVO>>
@@ -280,6 +447,7 @@ public class BookmarkController {
                     SnSpace newSpace = new SnSpace();
                     newSpace.setUserId(currentUserId);
                     newSpace.setName(spaceName);
+                    newSpace.setIcon("StarsIcon");
                     newSpace = spaceService.addSpace(newSpace);
                     namespaceId = newSpace.getId();
                 } else {
@@ -506,16 +674,163 @@ public class BookmarkController {
             return Result.fail("书签不存在或无权限编辑");
         }
 
-        // 如果更新了命名空间，检查新命名空间是否存在和属于当前用户
-        if (req.getNamespaceId() != null && !req.getNamespaceId().isEmpty()) {
-            if (!spaceService.isNamespaceBelongsToUser(req.getNamespaceId(), currentUserId)) {
+        // 处理命名空间 - 支持多种方式（类似 addBookmark 方法）
+        String namespaceId = null;
+
+        // 1. 处理传统的 :new 格式
+        if (req.getNamespaceId() != null && req.getNamespaceId().contains(":new")) {
+            // 解析命名空间名称
+            String spaceName = req.getNamespaceId().replace(":new", "").trim();
+            if (!spaceName.isEmpty()) {
+                // 检查是否已存在同名空间
+                if (!spaceService.isSpaceNameExists(currentUserId, spaceName, null)) {
+                    // 创建新空间
+                    SnSpace newSpace = new SnSpace();
+                    newSpace.setIcon("StarsIcon");
+                    newSpace.setUserId(currentUserId);
+                    newSpace.setName(spaceName);
+                    newSpace = spaceService.addSpace(newSpace);
+                    namespaceId = newSpace.getId();
+                } else {
+                    // 如果空间已存在，查找并使用现有的空间
+                    SnSpace existingSpace = spaceService.lambdaQuery()
+                            .eq(SnSpace::getUserId, currentUserId)
+                            .eq(SnSpace::getName, spaceName)
+                            .eq(SnSpace::getDeleted, 0)
+                            .one();
+                    if (existingSpace != null) {
+                        namespaceId = existingSpace.getId();
+                    }
+                }
+            } else {
+                return Result.fail("命名空间名称不能为空");
+            }
+        }
+        // 2. 处理 newSpace 对象格式
+        else if (req.getNewSpace() != null) {
+            EditBookmarkReq.NewSpace newSpaceInfo = req.getNewSpace();
+            String spaceName = newSpaceInfo.getName();
+
+            // 检查是否已存在同名空间
+            if (!spaceService.isSpaceNameExists(currentUserId, spaceName, null)) {
+                // 创建新空间
+                SnSpace newSpace = new SnSpace();
+                newSpace.setUserId(currentUserId);
+                newSpace.setName(spaceName);
+                newSpace.setDescription(newSpaceInfo.getDescription());
+                newSpace.setIcon("StarsIcon");
+                newSpace = spaceService.addSpace(newSpace);
+                namespaceId = newSpace.getId();
+            } else {
+                // 如果空间已存在，查找并使用现有的空间
+                SnSpace existingSpace = spaceService.lambdaQuery()
+                        .eq(SnSpace::getUserId, currentUserId)
+                        .eq(SnSpace::getName, spaceName)
+                        .eq(SnSpace::getDeleted, 0)
+                        .one();
+                if (existingSpace != null) {
+                    namespaceId = existingSpace.getId();
+                }
+            }
+        }
+        // 3. 处理普通的 namespaceId
+        else if (req.getNamespaceId() != null && !req.getNamespaceId().isEmpty()) {
+            namespaceId = req.getNamespaceId();
+        }
+        // 4. 如果没有提供任何空间信息，保持原有的空间设置
+        else {
+            namespaceId = existingBookmark.getSpaceId();
+        }
+
+        // 检查namespace是否存在和属于当前用户
+        if (namespaceId != null) {
+            if (!spaceService.isNamespaceBelongsToUser(namespaceId, currentUserId)) {
                 return Result.fail("命名空间不存在或无权限访问");
             }
         }
 
-        // 检查标签是否存在和属于当前用户
-        if (!tagService.areAllTagsBelongToUser(req.getTags(), currentUserId)) {
-            return Result.fail("部分标签不存在或无权限访问");
+        // 处理标签 - 支持多种方式（类似 addBookmark 方法）
+        List<String> tagIds = new ArrayList<>();
+
+        // 1. 处理传统的 tags 列表
+        if (req.getTags() != null && !req.getTags().isEmpty()) {
+            for (String tagInfo : req.getTags()) {
+                if (tagInfo.contains(":new:#")) {
+                    // 解析标签信息: 格式为 "标签名:new:#颜色代码"
+                    String[] parts = tagInfo.split(":new:#");
+                    if (parts.length == 2) {
+                        String tagName = parts[0].trim();
+                        String tagColor = parts[1].trim();
+
+                        if (!tagName.isEmpty() && !tagColor.isEmpty()) {
+                            // 检查是否已存在同名标签
+                            if (!tagService.isTagNameExists(currentUserId, tagName, null)) {
+                                // 创建新标签
+                                SnTag newTag = new SnTag();
+                                newTag.setUserId(currentUserId);
+                                newTag.setName(tagName);
+                                newTag.setColor(tagColor);
+                                newTag = tagService.addTag(newTag);
+                                tagIds.add(newTag.getId());
+                            } else {
+                                // 如果标签已存在，查找并使用现有的标签
+                                SnTag existingTag = tagService.lambdaQuery()
+                                        .eq(SnTag::getUserId, currentUserId)
+                                        .eq(SnTag::getName, tagName)
+                                        .eq(SnTag::getDeleted, 0)
+                                        .one();
+                                if (existingTag != null) {
+                                    tagIds.add(existingTag.getId());
+                                }
+                            }
+                        } else {
+                            return Result.fail("标签名称或颜色不能为空");
+                        }
+                    } else {
+                        return Result.fail("标签格式错误，应为: 标签名:new:#颜色代码");
+                    }
+                } else {
+                    // 普通标签ID，直接添加到列表
+                    tagIds.add(tagInfo);
+                }
+            }
+        }
+
+        // 2. 处理 newTags 对象格式
+        if (req.getNewTags() != null && !req.getNewTags().isEmpty()) {
+            for (EditBookmarkReq.NewTag newTagInfo : req.getNewTags()) {
+                String tagName = newTagInfo.getName();
+                String tagColor = newTagInfo.getColor();
+
+                // 检查是否已存在同名标签
+                if (!tagService.isTagNameExists(currentUserId, tagName, null)) {
+                    // 创建新标签
+                    SnTag newTag = new SnTag();
+                    newTag.setUserId(currentUserId);
+                    newTag.setName(tagName);
+                    newTag.setColor(tagColor);
+                    newTag.setDescription(newTagInfo.getDescription());
+                    newTag = tagService.addTag(newTag);
+                    tagIds.add(newTag.getId());
+                } else {
+                    // 如果标签已存在，查找并使用现有的标签
+                    SnTag existingTag = tagService.lambdaQuery()
+                            .eq(SnTag::getUserId, currentUserId)
+                            .eq(SnTag::getName, tagName)
+                            .eq(SnTag::getDeleted, 0)
+                            .one();
+                    if (existingTag != null) {
+                        tagIds.add(existingTag.getId());
+                    }
+                }
+            }
+        }
+
+        // 检查所有标签是否存在和属于当前用户
+        if (!tagIds.isEmpty()) {
+            if (!tagService.areAllTagsBelongToUser(tagIds, currentUserId)) {
+                return Result.fail("部分标签不存在或无权限访问");
+            }
         }
 
         // 更新书签基本信息
@@ -526,7 +841,7 @@ public class BookmarkController {
                 req.getUrl(),
                 req.getIcon(),
                 req.getDescription(),
-                req.getNamespaceId()
+                namespaceId
         );
 
         if (!updated) {
@@ -534,7 +849,7 @@ public class BookmarkController {
         }
 
         // 更新标签关联
-        bookmarkAssTagService.updateBookmarkTagAssociations(req.getId(), currentUserId, req.getTags());
+        bookmarkAssTagService.updateBookmarkTagAssociations(req.getId(), currentUserId, tagIds);
 
         // 获取更新后的书签信息
         SnBookmark updatedBookmark = bookmarkService.getBookmarkByUserAndId(req.getId(), currentUserId);
