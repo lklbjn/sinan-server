@@ -45,17 +45,23 @@ public class WebsiteAnalysisService {
         try {
             // 1. 发送开始抓取的状态
             sendEvent(emitter, "status", "正在抓取网站信息...", null);
-
+            String title = "";
+            String description = "";
             // 抓取网站信息
-            Document doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .timeout(10000)
-                    .get();
+            try {
+                Document doc = Jsoup.connect(url)
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .timeout(10000)
+                        .get();
 
-            String title = doc.title();
-            String description = doc.select("meta[name=description]").attr("content");
-            if (description.isEmpty()) {
-                description = doc.select("meta[property=og:description]").attr("content");
+                 title = doc.title();
+                 description = doc.select("meta[name=description]").attr("content");
+                if (description.isEmpty()) {
+                    description = doc.select("meta[property=og:description]").attr("content");
+                }
+            }catch (Exception ignore){
+                log.warn("抓取网站信息失败: {}", url, ignore);
+                title = url;
             }
 
             // 2. 发送网站基本信息
@@ -83,10 +89,6 @@ public class WebsiteAnalysisService {
             // 7. 完成
             emitter.complete();
 
-        } catch (IOException e) {
-            log.error("抓取网站信息失败: {}", url, e);
-            sendEvent(emitter, "error", "无法访问该网站: " + e.getMessage(), null);
-            emitter.completeWithError(e);
         } catch (Exception e) {
             log.error("分析网站失败: {}", url, e);
             sendEvent(emitter, "error", "分析失败: " + e.getMessage(), null);
