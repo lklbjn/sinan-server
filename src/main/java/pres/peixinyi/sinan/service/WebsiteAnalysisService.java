@@ -180,6 +180,10 @@ public class WebsiteAnalysisService {
         promptBuilder.append("以下是已有的标签：\n");
         promptBuilder.append("<tags>\n").append(String.join(", ", existingTags)).append("\n</tags>\n\n");
 
+        promptBuilder.append("以下是抓取到的网站名称和描述内容：\n");
+        promptBuilder.append("<name>\n").append(title).append("\n</name>\n)n\n");
+        promptBuilder.append("<description>\n").append(description).append("\n</description>\n\n");
+
         promptBuilder.append("在判断时，请遵循以下规则：\n");
         promptBuilder.append("1. 分类只能选择一个，且只能从<spaces>中选择，如果已有的分类都不匹配，则建议创建新的分类。\n");
         promptBuilder.append("2. 标签可以有多个，且只能从<tags>中选择，如果已有的标签都不匹配，则建议创建新的标签。\n");

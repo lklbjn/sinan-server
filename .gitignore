@@ -41,3 +41,4 @@ build/
 src/main/resources/application-prod.yaml
 src/main/resources/application-dev.yaml
 upload
+src/main/resources/application-deepseek.yaml
