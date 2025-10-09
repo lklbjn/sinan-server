@@ -403,7 +403,6 @@ sinan-server/
 <output>
 [在此给出最终的JSON格式输出]
 </output>
-
 ```
 
 如有问题或建议，欢迎提交 [Issue](../../issues) 或联系作者。
