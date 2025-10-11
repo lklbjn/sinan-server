@@ -550,6 +550,18 @@ public class ApiController {
             Map<String, List<SnTag>> bookmarkTagsMap =
                     bookmarkService.getBatchBookmarkTags(bookmarkIds);
 
+            // 对书签按访问次数降序、更新时间降序排序
+            bookmarks.sort((b1, b2) -> {
+                // 首先按访问次数降序排序
+                int numCompare = Integer.compare(b2.getNum() != null ? b2.getNum() : 0,
+                                               b1.getNum() != null ? b1.getNum() : 0);
+                if (numCompare != 0) {
+                    return numCompare;
+                }
+                // 访问次数相同时，按更新时间降序排序
+                return b2.getUpdateTime().compareTo(b1.getUpdateTime());
+            });
+
             // 构建书签响应对象
             List<BookmarkResp> bookmarkResps = bookmarks.stream()
                     .map(bookmark -> {
@@ -625,7 +637,7 @@ public class ApiController {
         Map<String, List<SnTag>> bookmarkTagsMap =
                 bookmarkService.getBatchBookmarkTags(bookmarkIds);
 
-        // 构建响应对象，包含标签信息
+        // 构建响应对象，包含标签信息，保持原有的排序（按访问次数降序）
         List<BookmarkResp> bookmarkResponses = bookmarks.stream()
                 .map(bookmark -> {
                     List<SnTag> tags =
@@ -633,7 +645,6 @@ public class ApiController {
                     return BookmarkResp.from(bookmark, tags);
                 })
                 .toList();
-
         return Result.success(bookmarkResponses);
     }
 

@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.util.ObjectUtils;
 import pres.peixinyi.sinan.module.sinan.entity.SnBookmarkAssTag;
+import pres.peixinyi.sinan.module.sinan.entity.SnShareSpaceAssUser;
 import pres.peixinyi.sinan.module.sinan.mapper.SnBookmarkMapper;
 import pres.peixinyi.sinan.module.sinan.entity.SnBookmark;
 import pres.peixinyi.sinan.module.sinan.entity.SnTag;
@@ -50,7 +51,7 @@ public class SnBookmarkService extends ServiceImpl<SnBookmarkMapper, SnBookmark>
         // 获取用户订阅空间ID列表
         List<String> subscribedSpaceIds = snShareSpaceAssUserService.getByUserId(userId)
             .stream()
-            .map(ass -> ass.getSpaceId())
+            .map(SnShareSpaceAssUser::getSpaceId)
             .collect(Collectors.toList());
 
         // 构建查询条件：用户自己的书签 或 订阅空间的书签
