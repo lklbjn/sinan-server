@@ -38,8 +38,7 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                         "/favicon/icon",
                         "/error",
                         "/passkey/**",
-                        "/api/*",
-                        "/bookmark/analyze-website");
+                        "/api/*");
 
     }
 }

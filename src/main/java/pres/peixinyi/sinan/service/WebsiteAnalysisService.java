@@ -189,8 +189,8 @@ public class WebsiteAnalysisService {
         promptBuilder.append("在判断时，请遵循以下规则：\n");
         promptBuilder.append("1. 分类只能选择一个，且只能从<spaces>中选择，如果已有的分类都不匹配，则建议创建新的分类。\n");
         promptBuilder.append("2. 标签可以有多个，且只能从<tags>中选择，如果已有的标签都不匹配，则建议创建新的标签。\n");
-        promptBuilder.append("3. 如果是新的分类则在分类名称后添加new标记，使用:分割。\n");
-        promptBuilder.append("4. 如果是新的Tag则在标签后添加上new标记，使用:分割。\n\n");
+        promptBuilder.append("3. 如果是新的Spaces则在Spaces名称后添加new标记，使用:分割。例如 视频网站:new\n");
+        promptBuilder.append("4. 如果是新的Tag则在标签后添加上new标记，使用:分割,并添加你觉得适合的16位颜色例如 Tag2:new:#000000\n\n");
 
         promptBuilder.append("请在<output>标签中给出最终的JSON格式输出，格式如下：\n");
         promptBuilder.append("{\n");

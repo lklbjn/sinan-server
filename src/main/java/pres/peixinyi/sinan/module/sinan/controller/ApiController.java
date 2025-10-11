@@ -1,13 +1,16 @@
 package pres.peixinyi.sinan.module.sinan.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pres.peixinyi.sinan.common.Result;
 import pres.peixinyi.sinan.dto.request.AddBookmarkReq;
 import pres.peixinyi.sinan.dto.response.BookmarkResp;
@@ -20,6 +23,8 @@ import pres.peixinyi.sinan.module.sinan.entity.SnTag;
 import pres.peixinyi.sinan.module.sinan.service.*;
 import pres.peixinyi.sinan.module.rbac.service.SnUserKeyService;
 import pres.peixinyi.sinan.module.favicon.service.FaviconService;
+import pres.peixinyi.sinan.service.WebsiteAnalysisService;
+import pres.peixinyi.sinan.common.UrlValidator;
 import pres.peixinyi.sinan.utils.PinyinUtils;
 
 import java.io.File;
@@ -38,6 +43,7 @@ import java.util.stream.Collectors;
  * @Date : 2025/8/22
  * @Version : 1.0.0
  */
+@Slf4j
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "*", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST})
@@ -63,6 +69,9 @@ public class ApiController {
 
     @Resource
     private SnShareSpaceAssUserService snShareSpaceAssUserService;
+
+    @Resource
+    private WebsiteAnalysisService websiteAnalysisService;
 
     /**
      * 验证访问密钥并获取用户ID
@@ -105,16 +114,157 @@ public class ApiController {
                 return Result.ok(existingBookmarkResp);
             }
 
+            // 处理命名空间 - 支持多种方式
+            String namespaceId = null;
+
+            // 1. 处理传统的 :new 格式
+            if (req.getNamespaceId() != null && req.getNamespaceId().contains(":new")) {
+                // 解析命名空间名称
+                String spaceName = req.getNamespaceId().replace(":new", "").trim();
+                if (!spaceName.isEmpty()) {
+                    // 检查是否已存在同名空间
+                    if (!spaceService.isSpaceNameExists(userId, spaceName, null)) {
+                        // 创建新空间
+                        SnSpace newSpace = new SnSpace();
+                        newSpace.setUserId(userId);
+                        newSpace.setName(spaceName);
+                        newSpace.setIcon("StarsIcon");
+                        newSpace = spaceService.addSpace(newSpace);
+                        namespaceId = newSpace.getId();
+                    } else {
+                        // 如果空间已存在，查找并使用现有的空间
+                        SnSpace existingSpace = spaceService.lambdaQuery()
+                                .eq(SnSpace::getUserId, userId)
+                                .eq(SnSpace::getName, spaceName)
+                                .eq(SnSpace::getDeleted, 0)
+                                .one();
+                        if (existingSpace != null) {
+                            namespaceId = existingSpace.getId();
+                        }
+                    }
+                } else {
+                    return Result.fail("命名空间名称不能为空");
+                }
+            }
+            // 2. 处理 newSpace 对象格式
+            else if (req.getNewSpace() != null) {
+                AddBookmarkReq.NewSpace newSpaceInfo = req.getNewSpace();
+                String spaceName = newSpaceInfo.getName();
+
+                // 检查是否已存在同名空间
+                if (!spaceService.isSpaceNameExists(userId, spaceName, null)) {
+                    // 创建新空间
+                    SnSpace newSpace = new SnSpace();
+                    newSpace.setUserId(userId);
+                    newSpace.setName(spaceName.replace(":new", ""));
+                    newSpace.setDescription(newSpaceInfo.getDescription());
+                    newSpace.setIcon("StarsIcon");
+                    newSpace = spaceService.addSpace(newSpace);
+                    namespaceId = newSpace.getId();
+                } else {
+                    // 如果空间已存在，查找并使用现有的空间
+                    SnSpace existingSpace = spaceService.lambdaQuery()
+                            .eq(SnSpace::getUserId, userId)
+                            .eq(SnSpace::getName, spaceName)
+                            .eq(SnSpace::getDeleted, 0)
+                            .one();
+                    if (existingSpace != null) {
+                        namespaceId = existingSpace.getId();
+                    }
+                }
+            }
+            // 3. 处理普通的 namespaceId
+            else {
+                namespaceId = req.getNamespaceId();
+            }
+
             // 检查namespace是否存在和属于当前用户
-            if (req.getNamespaceId() != null && !req.getNamespaceId().isEmpty()) {
-                if (!spaceService.isNamespaceBelongsToUser(req.getNamespaceId(), userId)) {
+            if (namespaceId != null) {
+                if (!spaceService.isNamespaceBelongsToUser(namespaceId, userId)) {
                     return Result.fail("命名空间不存在或无权限访问");
                 }
             }
 
-            // 检查Tags是否存在和属于当前用户
+            // 处理标签 - 支持多种方式
+            List<String> tagIds = new ArrayList<>();
+
+            // 1. 处理传统的 tagsIds 列表
             if (req.getTagsIds() != null && !req.getTagsIds().isEmpty()) {
-                if (!tagService.areAllTagsBelongToUser(req.getTagsIds(), userId)) {
+                for (String tagInfo : req.getTagsIds()) {
+                    if (tagInfo.contains(":new:#")) {
+                        // 解析标签信息: 格式为 "标签名:new:#颜色代码"
+                        String[] parts = tagInfo.split(":new:#");
+                        if (parts.length == 2) {
+                            String tagName = parts[0].trim();
+                            String tagColor = parts[1].trim();
+
+                            if (!tagName.isEmpty() && !tagColor.isEmpty()) {
+                                // 检查是否已存在同名标签
+                                if (!tagService.isTagNameExists(userId, tagName, null)) {
+                                    // 创建新标签
+                                    SnTag newTag = new SnTag();
+                                    newTag.setUserId(userId);
+                                    newTag.setName(tagName);
+                                    newTag.setColor(tagColor);
+                                    newTag = tagService.addTag(newTag);
+                                    tagIds.add(newTag.getId());
+                                } else {
+                                    // 如果标签已存在，查找并使用现有的标签
+                                    SnTag existingTag = tagService.lambdaQuery()
+                                            .eq(SnTag::getUserId, userId)
+                                            .eq(SnTag::getName, tagName)
+                                            .eq(SnTag::getDeleted, 0)
+                                            .one();
+                                    if (existingTag != null) {
+                                        tagIds.add(existingTag.getId());
+                                    }
+                                }
+                            } else {
+                                return Result.fail("标签名称或颜色不能为空");
+                            }
+                        } else {
+                            return Result.fail("标签格式错误，应为: 标签名:new:#颜色代码");
+                        }
+                    } else {
+                        // 普通标签ID，直接添加到列表
+                        tagIds.add(tagInfo);
+                    }
+                }
+            }
+
+            // 2. 处理 newTags 对象格式
+            if (req.getNewTags() != null && !req.getNewTags().isEmpty()) {
+                for (AddBookmarkReq.NewTag newTagInfo : req.getNewTags()) {
+                    String tagName = newTagInfo.getName();
+                    String tagColor = newTagInfo.getColor();
+
+                    // 检查是否已存在同名标签
+                    if (!tagService.isTagNameExists(userId, tagName, null)) {
+                        // 创建新标签
+                        SnTag newTag = new SnTag();
+                        newTag.setUserId(userId);
+                        newTag.setName(tagName);
+                        newTag.setColor(tagColor);
+                        newTag.setDescription(newTagInfo.getDescription());
+                        newTag = tagService.addTag(newTag);
+                        tagIds.add(newTag.getId());
+                    } else {
+                        // 如果标签已存在，查找并使用现有的标签
+                        SnTag existingTag = tagService.lambdaQuery()
+                                .eq(SnTag::getUserId, userId)
+                                .eq(SnTag::getName, tagName)
+                                .eq(SnTag::getDeleted, 0)
+                                .one();
+                        if (existingTag != null) {
+                            tagIds.add(existingTag.getId());
+                        }
+                    }
+                }
+            }
+
+            // 检查所有标签是否存在和属于当前用户
+            if (!tagIds.isEmpty()) {
+                if (!tagService.areAllTagsBelongToUser(tagIds, userId)) {
                     return Result.fail("部分标签不存在或无权限访问");
                 }
             }
@@ -122,7 +272,7 @@ public class ApiController {
             // 初始化参数
             SnBookmark bookmark = new SnBookmark();
             bookmark.setUserId(userId);
-            bookmark.setSpaceId(req.getNamespaceId());
+            bookmark.setSpaceId(namespaceId);
             // 截取书签名称到30位
             String bookmarkName = req.getName();
             if (bookmarkName != null && bookmarkName.length() > 30) {
@@ -136,8 +286,8 @@ public class ApiController {
             SnBookmark savedBookmark = bookmarkService.addBookmark(bookmark);
 
             // 处理标签关联
-            if (req.getTagsIds() != null && !req.getTagsIds().isEmpty()) {
-                for (String tagId : req.getTagsIds()) {
+            if (!tagIds.isEmpty()) {
+                for (String tagId : tagIds) {
                     SnBookmarkAssTag assTag = new SnBookmarkAssTag();
                     assTag.setUserId(userId);
                     assTag.setBookmarkId(savedBookmark.getId());
@@ -633,6 +783,124 @@ public class ApiController {
         } catch (Exception e) {
             return Result.fail("获取标签列表失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 使用AI分析网站并通过SSE流式返回分类和标签建议
+     * 注意: EventSource只支持GET请求且不支持自定义Header
+     * 需要通过URL参数传递accessKey: ?accessKey=YOUR_ACCESS_KEY
+     *
+     * @param url 要分析的网站URL
+     * @param accessKey 访问密钥 (从URL参数获取)
+     * @return SSE流式响应
+     */
+    @CrossOrigin(origins = "*")
+    @GetMapping(value = "/analyze-website", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter analyzeWebsite(
+            @RequestParam("url") String url,
+            @RequestParam("accessKey") String accessKey) {
+
+        // 通过accessKey获取用户ID
+        String currentUserId;
+        try {
+            currentUserId = authenticateUser(accessKey);
+            if (currentUserId == null) {
+                SseEmitter emitter = new SseEmitter(1000L);
+                try {
+                    emitter.send(SseEmitter.event()
+                            .name("error")
+                            .data(Map.of(
+                                    "type", "error",
+                                    "message", "访问密钥无效或已过期",
+                                    "timestamp", System.currentTimeMillis()
+                            )));
+                    emitter.complete();
+                } catch (Exception e) {
+                    emitter.completeWithError(e);
+                }
+                return emitter;
+            }
+        } catch (Exception e) {
+            log.warn("访问密钥验证失败: {}", e.getMessage());
+            SseEmitter emitter = new SseEmitter(1000L);
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data(Map.of(
+                                "type", "error",
+                                "message", "认证失败: " + e.getMessage(),
+                                "timestamp", System.currentTimeMillis()
+                        )));
+                emitter.complete();
+            } catch (Exception sendError) {
+                emitter.completeWithError(sendError);
+            }
+            return emitter;
+        }
+
+        // 创建SSE发射器，设置超时时间为60秒
+        SseEmitter emitter = new SseEmitter(60000L);
+
+        // URL验证
+        String validationError = UrlValidator.validate(url);
+        if (validationError != null) {
+            log.warn("URL验证失败: {} - {}", url, validationError);
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data(Map.of(
+                                "type", "error",
+                                "message", validationError,
+                                "timestamp", System.currentTimeMillis()
+                        )));
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+            return emitter;
+        }
+
+        // 异步执行分析任务
+        new Thread(() -> {
+            try {
+                // 获取用户现有的分类列表
+                List<SnSpace> spaces = spaceService.getUserSpaces(currentUserId);
+                List<String> existingSpaces = spaces.stream()
+                        .map(SnSpace::getName)
+                        .toList();
+
+                // 获取用户现有的标签列表
+                List<SnTag> tags = tagService.getUserTags(currentUserId);
+                List<String> existingTags = tags.stream()
+                        .map(SnTag::getName)
+                        .toList();
+
+                // 调用流式AI分析服务
+                websiteAnalysisService.analyzeWebsiteStreaming(
+                        url.trim(),
+                        existingSpaces,
+                        existingTags,
+                        emitter
+                );
+
+            } catch (Exception e) {
+                log.error("分析网站失败: {}", url, e);
+                try {
+                    emitter.send(SseEmitter.event()
+                            .name("error")
+                            .data(Map.of(
+                                    "type", "error",
+                                    "message", "分析失败: " + e.getMessage(),
+                                    "timestamp", System.currentTimeMillis()
+                            )));
+                } catch (Exception sendError) {
+                    log.error("发送错误事件失败", sendError);
+                }
+                emitter.completeWithError(e);
+            }
+        }).start();
+
+        return emitter;
     }
 
 }
