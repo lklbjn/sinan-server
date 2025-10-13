@@ -8,6 +8,7 @@ import java.util.UUID;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import pres.peixinyi.sinan.module.rbac.domain.CredentialType;
@@ -24,11 +25,11 @@ import static pres.peixinyi.sinan.module.rbac.domain.CredentialType.USERNAME;
 public class SnUserService extends ServiceImpl<SnUserMapper, SnUser> {
 
     private final SnUserCredentialService snUserCredentialService;
-    private final EmailService emailService;
+    private final Optional<EmailService> emailService;
     private final PasswordResetService passwordResetService;
 
     @Autowired
-    public SnUserService(SnUserCredentialService snUserCredentialService, EmailService emailService, PasswordResetService passwordResetService) {
+    public SnUserService(SnUserCredentialService snUserCredentialService, Optional<EmailService> emailService, PasswordResetService passwordResetService) {
         this.snUserCredentialService = snUserCredentialService;
         this.emailService = emailService;
         this.passwordResetService = passwordResetService;
@@ -303,6 +304,11 @@ public class SnUserService extends ServiceImpl<SnUserMapper, SnUser> {
             throw new UserCredentialException("邮箱不存在");
         }
 
+        // 检查邮件服务是否可用
+        if (!emailService.isPresent()) {
+            throw new UserCredentialException("邮件服务不可用，请联系管理员重置密码");
+        }
+
         // 生成重置验证码（32位UUID）
         String resetCode = UUID.randomUUID().toString().replace("-", "");
 
@@ -311,7 +317,7 @@ public class SnUserService extends ServiceImpl<SnUserMapper, SnUser> {
             passwordResetService.createPasswordResetCode(userId, resetCode, 15);
 
             // 发送重置邮件
-            emailService.sendPasswordResetEmail(email, resetCode);
+            emailService.get().sendPasswordResetEmail(email, resetCode);
 
             return true;
         } catch (Exception e) {

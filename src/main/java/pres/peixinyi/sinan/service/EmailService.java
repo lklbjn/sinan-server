@@ -2,6 +2,8 @@ package pres.peixinyi.sinan.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Service;
  * 邮件服务
  */
 @Service
+@ConditionalOnExpression("'${spring.mail.host:}'.trim() != ''")
 public class EmailService {
 
     @Autowired
