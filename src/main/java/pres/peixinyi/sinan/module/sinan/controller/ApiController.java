@@ -27,6 +27,8 @@ import pres.peixinyi.sinan.service.WebsiteAnalysisService;
 import pres.peixinyi.sinan.common.UrlValidator;
 import pres.peixinyi.sinan.utils.PinyinUtils;
 
+import java.util.Optional;
+
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -71,7 +73,7 @@ public class ApiController {
     private SnShareSpaceAssUserService snShareSpaceAssUserService;
 
     @Resource
-    private WebsiteAnalysisService websiteAnalysisService;
+    private Optional<WebsiteAnalysisService> websiteAnalysisService;
 
     /**
      * 验证访问密钥并获取用户ID
@@ -871,6 +873,23 @@ public class ApiController {
             return emitter;
         }
 
+        // 检查AI服务是否可用
+        if (!websiteAnalysisService.isPresent()) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data(Map.of(
+                                "type", "error",
+                                "message", "AI分析服务不可用，请配置OpenAI API密钥",
+                                "timestamp", System.currentTimeMillis()
+                        )));
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+            return emitter;
+        }
+
         // 异步执行分析任务
         new Thread(() -> {
             try {
@@ -887,7 +906,7 @@ public class ApiController {
                         .toList();
 
                 // 调用流式AI分析服务
-                websiteAnalysisService.analyzeWebsiteStreaming(
+                websiteAnalysisService.get().analyzeWebsiteStreaming(
                         url.trim(),
                         existingSpaces,
                         existingTags,

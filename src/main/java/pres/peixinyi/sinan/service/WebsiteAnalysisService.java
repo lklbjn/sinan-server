@@ -10,6 +10,7 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pres.peixinyi.sinan.dto.response.WebsiteAnalysisResponse;
@@ -29,6 +30,7 @@ import java.util.regex.Pattern;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@ConditionalOnExpression("'${spring.ai.openai.api-key:}'.trim() != ''")
 public class WebsiteAnalysisService {
 
     private final ChatClient.Builder chatClientBuilder;

@@ -43,6 +43,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -76,7 +77,7 @@ public class BookmarkController {
     UploadProperties uploadProperties;
 
     @Resource
-    WebsiteAnalysisService websiteAnalysisService;
+    Optional<WebsiteAnalysisService> websiteAnalysisService;
 
     @Value("${sinan.server.base-url}")
     private String baseUrl;
@@ -1615,6 +1616,23 @@ public class BookmarkController {
             return emitter;
         }
 
+        // 检查AI服务是否可用
+        if (!websiteAnalysisService.isPresent()) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data(Map.of(
+                                "type", "error",
+                                "message", "AI分析服务不可用，请配置OpenAI API密钥",
+                                "timestamp", System.currentTimeMillis()
+                        )));
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+            return emitter;
+        }
+
         // 异步执行分析任务
         new Thread(() -> {
             try {
@@ -1631,7 +1649,7 @@ public class BookmarkController {
                         .toList();
 
                 // 调用流式AI分析服务
-                websiteAnalysisService.analyzeWebsiteStreaming(
+                websiteAnalysisService.get().analyzeWebsiteStreaming(
                         url.trim(),
                         existingSpaces,
                         existingTags,
