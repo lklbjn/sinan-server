@@ -16,6 +16,7 @@ import pres.peixinyi.sinan.module.github.domain.UserResp;
 import pres.peixinyi.sinan.module.rbac.service.SnUserCredentialService;
 import pres.peixinyi.sinan.module.rbac.service.SnUserService;
 import pres.peixinyi.sinan.utils.HttpUtil;
+import pres.peixinyi.sinan.utils.NameUtils;
 
 import java.util.Date;
 import java.util.UUID;
@@ -113,7 +114,7 @@ public class GithubOAuth2Service {
             if (ObjectUtils.isEmpty(userIdByEmail)) {
                 //创建账户
                 SnUser snUser = new SnUser();
-                snUser.setName(userResp.getName());
+                snUser.setName(ObjectUtils.isEmpty(userResp.getName())? NameUtils.generateRandomName() :userResp.getName());
                 snUser.setAvatar(userResp.getAvatarUrl());
                 snUser.setCreateTime(new Date());
                 snUser.setUpdateTime(new Date());
