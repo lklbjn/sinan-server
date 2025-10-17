@@ -1,10 +1,8 @@
 package pres.peixinyi.sinan;
 
 
-import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
 
 /**
  * 启动类
@@ -13,7 +11,7 @@ import org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration;
  * @Date : 2025/8/8 15:32
  * @Version : 0.0.0
  */
-@SpringBootApplication(exclude = {MailSenderAutoConfiguration.class})
+@SpringBootApplication
 public class SinanApplicationRun {
     public static void main(String[] args) {
         SpringApplication.run(SinanApplicationRun.class, args);

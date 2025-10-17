@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="pres.peixinyi.sinan.module.feedback.mapper.FeedbackMapper">
+  <resultMap id="BaseResultMap" type="pres.peixinyi.sinan.module.feedback.entity.Feedback">
+    <!--@mbg.generated-->
+    <!--@Table feedback-->
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="user_id" jdbcType="VARCHAR" property="userId" />
+    <result column="contact" jdbcType="VARCHAR" property="contact" />
+    <result column="content" jdbcType="LONGVARCHAR" property="content" />
+    <result column="status" jdbcType="INTEGER" property="status" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="deleted" jdbcType="INTEGER" property="deleted" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    <!--@mbg.generated-->
+    id, user_id, contact, content, `status`, create_time, update_time, deleted
+  </sql>
+</mapper>
