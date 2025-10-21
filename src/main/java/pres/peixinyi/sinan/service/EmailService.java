@@ -1,17 +1,15 @@
 package pres.peixinyi.sinan.service;
 
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 
 /**
  * 邮件服务
@@ -33,7 +31,7 @@ public class EmailService {
     /**
      * 发送密码重置邮件
      *
-     * @param toEmail 收件人邮箱
+     * @param toEmail   收件人邮箱
      * @param resetCode 重置验证码
      */
     public void sendPasswordResetEmail(String toEmail, String resetCode) {
@@ -45,12 +43,12 @@ public class EmailService {
 
             String resetUrl = baseUrl + "/forgetpassword?code=" + resetCode;
             String emailContent = String.format(
-                "您好，\n\n" +
-                "您请求重置您的 Sinan 账户密码。请点击以下链接重置您的密码：\n\n" +
-                "%s\n\n" +
-                "此链接将在15分钟后过期。如果您没有请求重置密码，请忽略此邮件。\n\n" +
-                "Sinan 团队",
-                resetUrl
+                    "您好，\n\n" +
+                            "您请求重置您的 Sinan 账户密码。请点击以下链接重置您的密码：\n\n" +
+                            "%s\n\n" +
+                            "此链接将在15分钟后过期。如果您没有请求重置密码，请忽略此邮件。\n\n" +
+                            "Sinan 团队",
+                    resetUrl
             );
 
             message.setText(emailContent);
@@ -64,10 +62,10 @@ public class EmailService {
     /**
      * 发送反馈通知邮件
      *
-     * @param toEmail 收件人邮箱
-     * @param contact 反馈者联系方式
+     * @param toEmail    收件人邮箱
+     * @param contact    反馈者联系方式
      * @param feedbackId 反馈ID
-     * @param content 反馈内容
+     * @param content    反馈内容
      * @param createTime 创建时间
      */
     public void sendFeedbackNotificationEmail(String toEmail, String contact, String feedbackId, String content, java.util.Date createTime) {
@@ -97,9 +95,9 @@ public class EmailService {
     /**
      * 构建反馈邮件内容
      *
-     * @param contact 反馈者联系方式
+     * @param contact    反馈者联系方式
      * @param feedbackId 反馈ID
-     * @param content 反馈内容
+     * @param content    反馈内容
      * @param createTime 创建时间
      * @return HTML邮件内容
      */
