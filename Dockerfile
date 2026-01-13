@@ -11,13 +11,14 @@ ARG JVM_ARGS=""
 ENV SOFTWARE_VERSION=${SOFTWARE_VERSION}
 ENV SOFTWARE_VERSION_DATE=${SOFTWARE_VERSION_DATE}
 
-# 安装必要的工具
-RUN apt-get update && apt-get install -y \
+# 安装必要的工具（Alpine 使用 apk）
+RUN apk add --no-cache \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    tzdata
 
-# 创建应用用户（安全最佳实践）
-RUN groupadd -r sinan && useradd -r -g sinan sinan
+# 创建应用用户（安全最佳实践）- Alpine 方式
+RUN addgroup -g 1000 sinan && \
+    adduser -D -u 1000 -G sinan sinan
 
 # 设置工作目录
 WORKDIR /app
@@ -32,16 +33,12 @@ RUN chown -R sinan:sinan /app
 ENV CONFIG_PATH=/resources/application.yaml
 ENV JVM_ARGS="${JVM_ARGS} -Duser.timezone=Asia/Shanghai -Djava.security.egd=file:/dev/./urandom"
 
-# 设置时区
-RUN echo 'Asia/Shanghai' > /etc/timezone && \
-    ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+# 设置时区（Alpine 方式）
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 
-# 创建并设置日志目录
-RUN mkdir -p /app/logs && \
-    chown -R sinan:sinan /app/logs
-
-RUN mkdir -p /app/upload && \
-    chown -R sinan:sinan /app/upload
+# 创建并设置日志和上传目录
+RUN mkdir -p /app/logs /app/upload && \
+    chown -R sinan:sinan /app/logs /app/upload
 
 # 暴露端口
 EXPOSE 8080
