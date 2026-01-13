@@ -1,6 +1,5 @@
 package pres.peixinyi.sinan.module.sinan.controller;
 
-import cn.dev33.satoken.stp.StpUtil;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -12,30 +11,25 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pres.peixinyi.sinan.common.Result;
+import pres.peixinyi.sinan.common.UrlValidator;
 import pres.peixinyi.sinan.dto.request.AddBookmarkReq;
 import pres.peixinyi.sinan.dto.response.BookmarkResp;
 import pres.peixinyi.sinan.dto.response.BookmarkTreeResp;
 import pres.peixinyi.sinan.dto.response.TagResp;
+import pres.peixinyi.sinan.module.favicon.service.FaviconService;
+import pres.peixinyi.sinan.module.rbac.service.SnUserKeyService;
 import pres.peixinyi.sinan.module.sinan.entity.SnBookmark;
 import pres.peixinyi.sinan.module.sinan.entity.SnBookmarkAssTag;
 import pres.peixinyi.sinan.module.sinan.entity.SnSpace;
 import pres.peixinyi.sinan.module.sinan.entity.SnTag;
 import pres.peixinyi.sinan.module.sinan.service.*;
-import pres.peixinyi.sinan.module.rbac.service.SnUserKeyService;
-import pres.peixinyi.sinan.module.favicon.service.FaviconService;
 import pres.peixinyi.sinan.service.WebsiteAnalysisService;
-import pres.peixinyi.sinan.common.UrlValidator;
 import pres.peixinyi.sinan.utils.PinyinUtils;
-
-import java.util.Optional;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -811,7 +805,7 @@ public class ApiController {
     @GetMapping(value = "/analyze-website", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter analyzeWebsite(
             @RequestParam("url") String url,
-            @RequestParam("accessKey") String accessKey) {
+            @RequestHeader("X-Access-Key") String accessKey) {
 
         // 通过accessKey获取用户ID
         String currentUserId;
